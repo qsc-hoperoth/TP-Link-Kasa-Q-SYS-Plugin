@@ -7,8 +7,11 @@ local Colors = {
   Blue = {0, 0, 255},
   Gray = {136, 136, 136},
   LightGray = {51,51,51},
-  PluginColor = {147,169,213}
+  KasaBlue = {74,203,214},
+  PluginColor = {74,203,214}
 }
+
+local MaxDevices = 24
 
 -- Define the color of the plugin object in the design
 function GetColor(props)
@@ -17,12 +20,18 @@ end
 
 -- The name that will initially display when dragged into a design
 function GetPrettyName(props)
-  return PluginInfo.Name .. "\r" .. PluginInfo.Version
+  return PluginInfo.Name .. "\r" .. PluginInfo.BuildVersion
   -- return "Vaddio" .. props["Model"].Value .. " " .. PluginInfo.Version
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Main"} --List the pages within the plugin
+PageNames = {"Setup"} --List the pages within the plugin
+function PopulatePageNames(props)
+  for x = 1, props["Number Of Devices"].Value do
+    table.insert(PageNames, "Device " .. x)
+  end
+end
+
 function GetPages(props)
   local pages = {}
   --[[ #include "pages.lua" ]]
