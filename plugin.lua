@@ -25,7 +25,7 @@ function GetPrettyName(props)
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Setup"} --List the pages within the plugin
+PageNames = {"Central Control","Discovery"} --List the pages within the plugin
 function PopulatePageNames(props)
   for x = 1, props["Number Of Devices"].Value do
     table.insert(PageNames, "Device " .. x)

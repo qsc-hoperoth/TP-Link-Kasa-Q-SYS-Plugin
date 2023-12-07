@@ -1,7 +1,7 @@
 PluginInfo = {
   Name = "TP-Link Kasa Local TCP",
   Author = "Eugene Dunn",
-  BuildVersion = "0.1.0.10",
+  BuildVersion = "0.1.1.2",
   Version = "0.1",
   Id = "d71cb671-6e0a-4a35-9ca4-20a247089870",
   Description = ""
@@ -32,7 +32,7 @@ function GetPrettyName(props)
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Setup"} --List the pages within the plugin
+PageNames = {"Central Control","Discovery"} --List the pages within the plugin
 function PopulatePageNames(props)
   for x = 1, props["Number Of Devices"].Value do
     table.insert(PageNames, "Device " .. x)
@@ -61,6 +61,12 @@ function GetProperties()
       Value = 1
     }
   )
+  table.insert(props, {
+    Name = "Debug Print",
+    Type = "enum",
+    Choices = {"None", "Tx/Rx", "Tx", "Rx", "Function Calls", "All"},
+    Value = "None"
+  })
   return props
 end
 
@@ -72,6 +78,9 @@ end
 
 -- Optional function to update available properties when properties are altered by the user
 function RectifyProperties(props)
+  if props.plugin_show_debug.Value == false then 
+    props["Debug Print"].IsHidden = true 
+  end
   return props
 end
 
@@ -159,10 +168,20 @@ function GetControls(props)
     table.insert(
       ctrls,
       {
+        Name = "Device_" .. d .. "_Toggle",
+        ControlType = "Button",
+        ButtonType = "Toggle",
+        PinStyle = "Both",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
         Name = "Device_" .. d .. "_Brightness",
         ControlType = "Knob",
         ControlUnit = "Percent",
-        Min = 0,
+        Min = 1,
         Max = 100,
         PinStyle = "Both",
         UserPin = true
@@ -172,6 +191,46 @@ function GetControls(props)
       ctrls,
       {
         Name = "Device_" .. d .. "_Name",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Model",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Mac",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Firmware",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Rssi",
         ControlType = "Indicator",
         IndicatorType = "Text",
         PinStyle = "Output",
@@ -191,86 +250,367 @@ function GetControlLayout(props)
   local x, y = 0, 10
   
   local current_page = props["page_index"].Value
+  local NumberOfDevices = props["Number Of Devices"].Value
   
-  if current_page == 1 then --Setup
-    layout["Discover"] = 
-    {
+  if current_page == 2 then --Setup
+    layout["Discover"] = {
       Position = {x, y},
-      Size = {60,40},
+      Size = {60, 40},
       Style = "Button",
       Legend = "Discover",
-      FontSize = 14,
+      FontSize = 14
     }
     y = y + 60
-    layout["Discovered Devices"] = 
-    {
+    layout["Discovered Devices"] = {
       Position = {x, y},
-      Size = {300,300},
+      Size = {300, 300},
       Style = "Text",
       Legend = "Discovered Devices",
       HTextAlign = "Left",
       VTextAlign = "Top",
-      FontSize = 12,
+      FontSize = 12
     }
-  else 
-    local index = current_page - 1
+  elseif current_page == 1 then -- Central Control
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {40, 20},
+        Text = "Index",
+        FontSize = 12
+      }
+    )
+    x = x + 40
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {125, 20},
+        Text = "IP Address",
+        FontSize = 12
+      }
+    )
+    x = x + 125
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {150, 20},
+        Text = "Status",
+        FontSize = 12
+      }
+    )
+    x = x + 150
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {150, 20},
+        Text = "Name",
+        FontSize = 12
+      }
+    )
+    x = x + 150
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "Toggle",
+        FontSize = 12
+      }
+    )
+    x = x + 75
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "Brightness",
+        FontSize = 12
+      }
+    )
+    for d = 1, NumberOfDevices do
+      x = 0
+      y = y + 20
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {40, 20},
+          Text = tostring(d),
+          FontSize = 12
+        }
+      )
+      x = x + 40
+      layout["Device_" .. d .. "_IP"] = {
+        PrettyName = "Device" .. d .. "~IP Address",
+        Position = {x, y},
+        Size = {125, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      x = x + 125
+      layout["Device_" .. d .. "_Status"] = {
+        PrettyName = "Device" .. d .. "~Status",
+        Position = {x, y},
+        Size = {150, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      x = x + 150
+      layout["Device_" .. d .. "_Name"] = {
+        PrettyName = "Device" .. d .. "~Name",
+        Position = {x, y},
+        Size = {150, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      x = x + 150
+      layout["Device_" .. d .. "_Toggle"] = {
+        PrettyName = "Device" .. d .. "~Toggle",
+        Position = {x, y},
+        Size = {75, 20},
+        Style = "Button",
+        Legend = "Toggle",
+        FontSize = 12,
+        Margin = 0
+      }
+      x = x + 75
+      layout["Device_" .. d .. "_Brightness"] = {
+        PrettyName = "Device" .. d .. "~Brightness",
+        Position = {x, y},
+        Size = {75, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+  
+    end
+  else
+    local index = current_page - 2
     table.insert(
       graphics,
       {
         Type = "GroupBox",
         Position = {x, y},
-        Size = {200,100},
+        Size = {300, 70},
         Text = "Connection",
         FontSize = 12,
+        StrokeColor = Colors.Black,
+        StrokeWidth = 1,
+        CornerRadius = 5
       }
     )
     x = 10
-    y = 20
+    y = 30
     table.insert(
       graphics,
       {
-        Type = "GroupBox",
+        Type = "Label",
         Position = {x, y},
-        Size = {75,20},
+        Size = {125, 20},
         Text = "IP Address",
-        FontSize = 12,
+        FontSize = 12
       }
     )
-    layout["Device_" .. index .. "_IP"] = 
-    {
+    layout["Device_" .. index .. "_IP"] = {
+      PrettyName = "Device" .. index .. "~IP Address",
       Position = {x, y + 20},
-      Size = {75,20},
+      Size = {125, 20},
       Style = "Text",
-      FontSize = 12,
+      FontSize = 12
     }
-    x = x + 85
+    x = x + 135
     table.insert(
       graphics,
       {
-        Type = "GroupBox",
+        Type = "Label",
         Position = {x, y},
-        Size = {100,20},
+        Size = {150, 20},
         Text = "Status",
-        FontSize = 12,
+        FontSize = 12
       }
     )
-    layout["Device_" .. index .. "_Status"] = 
-    {
+    layout["Device_" .. index .. "_Status"] = {
+      PrettyName = "Device" .. index .. "~Status",
       Position = {x, y + 20},
-      Size = {100,20},
+      Size = {150, 20},
       Style = "Text",
-      FontSize = 12,
+      FontSize = 12
     }
+    x = 0
+    y = 90
     table.insert(
       graphics,
       {
         Type = "GroupBox",
         Position = {x, y},
-        Size = {100,20},
+        Size = {100, 200},
         Text = "Control",
         FontSize = 12,
+        StrokeColor = Colors.Black,
+        StrokeWidth = 1,
+        CornerRadius = 5
       }
     )
+    table.insert(
+      graphics,
+      {
+        Type = "GroupBox",
+        Position = {x + 110, y},
+        Size = {190, 200},
+        Text = "Device Info",
+        FontSize = 12,
+        StrokeColor = Colors.Black,
+        StrokeWidth = 1,
+        CornerRadius = 5
+      }
+    )
+    --Control
+    x = 5
+    y = y + 20
+    TopY = y
+  
+    layout["Device_" .. index .. "_On"] = {
+      PrettyName = "Device" .. index .. "~On",
+      Position = {x, y},
+      Size = {40, 40},
+      Style = "Button",
+      Legend = "On",
+      FontSize = 12
+    }
+    x = x + 50
+    layout["Device_" .. index .. "_Off"] = {
+      PrettyName = "Device" .. index .. "~Off",
+      Position = {x, y},
+      Size = {40, 40},
+      Style = "Button",
+      Legend = "Off",
+      FontSize = 12
+    }
+    x = 5
+    y = y + 50
+    layout["Device_" .. index .. "_Toggle"] = {
+      PrettyName = "Device" .. index .. "~Toggle",
+      Position = {x, y},
+      Size = {90, 40},
+      Style = "Button",
+      Legend = "Toggle",
+      FontSize = 12
+    }
+    y = y + 50
+    layout["Device_" .. index .. "_Brightness"] = {
+      PrettyName = "Device" .. index .. "~Brightness",
+      Position = {x, y},
+      Size = {90, 80},
+      Style = "Knob",
+      FontSize = 12
+    }
+  
+    --Device Info
+    x = x + 110
+    y = TopY
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "Name",
+        FontSize = 12,
+        HTextAlign = "Right"
+      }
+    )
+    layout["Device_" .. index .. "_Name"] = {
+      PrettyName = "Device" .. index .. "~Name",
+      Position = {x + 80, y},
+      Size = {100, 20},
+      Style = "Text",
+      FontSize = 12
+    }
+    y = y + 25
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "Model",
+        FontSize = 12,
+        HTextAlign = "Right"
+      }
+    )
+    layout["Device_" .. index .. "_Model"] = {
+      PrettyName = "Device" .. index .. "~Model",
+      Position = {x + 80, y},
+      Size = {100, 20},
+      Style = "Text",
+      FontSize = 12
+    }
+    y = y + 25
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "Mac Address",
+        FontSize = 12,
+        HTextAlign = "Right"
+      }
+    )
+    layout["Device_" .. index .. "_Mac"] = {
+      PrettyName = "Device" .. index .. "~Mac Address",
+      Position = {x + 80, y},
+      Size = {100, 20},
+      Style = "Text",
+      FontSize = 9
+    }
+    y = y + 25
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "Firmware",
+        FontSize = 12,
+        HTextAlign = "Right"
+      }
+    )
+    layout["Device_" .. index .. "_Firmware"] = {
+      PrettyName = "Device" .. index .. "~Firmware",
+      Position = {x + 80, y},
+      Size = {100, 20},
+      Style = "Text",
+      FontSize = 12
+    }
+    y = y + 25
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Position = {x, y},
+        Size = {75, 20},
+        Text = "RSSI",
+        FontSize = 12,
+        HTextAlign = "Right"
+      }
+    )
+    layout["Device_" .. index .. "_Rssi"] = {
+      PrettyName = "Device" .. index .. "~RSSI",
+      Position = {x + 80, y},
+      Size = {100, 20},
+      Style = "Text",
+      FontSize = 12
+    }
   end
   return layout, graphics
 end
@@ -278,6 +618,24 @@ end
 --Start event based logic
 if Controls then
   rapidjson = require("rapidjson")
+  
+  NumberOfDevices = Properties["Number Of Devices"].Value
+  
+  DebugTx, DebugRx, DebugFunction = false, false, false
+  DebugPrint = Properties["Debug Print"].Value
+  if DebugPrint == "Tx/Rx" then
+    DebugTx, DebugRx = true, true
+  elseif DebugPrint == "Tx" then
+    DebugTx = true
+  elseif DebugPrint == "Rx" then
+    DebugRx = true
+  elseif DebugPrint == "Function Calls" then
+    DebugFunction = true
+  elseif DebugPrint == "All" then
+    DebugTx, DebugRx, DebugFunction = true, true, true
+  end
+  
+  StatusState = {OK = 0, COMPROMISED = 1, FAULT = 2, NOTPRESENT = 3, MISSING = 4, INITIALIZING = 5}
   
     function decode(buf, udp)
       local ascii = ""
@@ -343,39 +701,222 @@ if Controls then
       end 
       return result
     end 
-  
-  local DiscoveredDevices = {}
-  
-  function RenderDiscoveredDevices()
-    Controls["Discovered Devices"].String = ""
-    local toPrint = ""
-    for _, device in pairs(DiscoveredDevices) do
-      toPrint = toPrint..device.alias.."["..device.model.."] - "..device.ip.."\n"
+    local DiscoveredDevices = {}
+    
+    function RenderDiscoveredDevices()
+      Controls["Discovered Devices"].String = ""
+      local toPrint = ""
+      for _, device in pairs(DiscoveredDevices) do
+        toPrint = toPrint..device.alias.."["..device.model.."] - "..device.ip.."\n"
+      end
+      Controls["Discovered Devices"].String = toPrint
     end
-    Controls["Discovered Devices"].String = toPrint
+    
+    DiscoverySocket = UdpSocket.New()
+    DiscoverySocket.EventHandler = function(socket, packet)  
+      data = decode(packet.Data,true)
+      if data.system.get_sysinfo.alias then 
+        print(decodeToString(packet.Data,true))
+        print(data.system.get_sysinfo.alias.."["..data.system.get_sysinfo.model.."] - "..packet.Address)
+        if DiscoveredDevices[data.system.get_sysinfo.mac] == nil then
+          DiscoveredDevices[data.system.get_sysinfo.mac] = {}
+        end
+        DiscoveredDevices[data.system.get_sysinfo.mac].alias = data.system.get_sysinfo.alias
+        DiscoveredDevices[data.system.get_sysinfo.mac].model = data.system.get_sysinfo.model
+        DiscoveredDevices[data.system.get_sysinfo.mac].ip = packet.Address
+      end 
+      RenderDiscoveredDevices()
+    end 
+    
+    DiscoverySocket:Open("",9999)
+    Controls.Discover.EventHandler = function()
+      print("Sending Discovery packet")
+      DiscoveredDevices = {}
+      RenderDiscoveredDevices()
+      DiscoverySocket:Send("255.255.255.255",9999,"\xd0\xf2\x81\xf8\x8b\xff\x9a\xf7\xd5\xef\x94\xb6\xd1\xb4\xc0\x9f\xec\x95\xe6\x8f\xe1\x87\xe8\xca\xf0\x8b\xf6\x8b\xf6")
+    end 
+  Sockets = {}
+  Timers = {}
+  FaderDebounce = {}
+  local PollTime = 5
+  
+  for x = 1, NumberOfDevices do
+    table.insert(Sockets, TcpSocket.New())
+    table.insert(Timers, Timer.New())
+    table.insert(FaderDebounce, Timer.New())
+  
+    Timers[x].EventHandler = function()
+      DevicePoll(x)
+    end
+    Sockets[x].EventHandler = function(socket, event, err)
+      -- print(event)
+      if event == TcpSocket.Events.Data then
+        data = socket:Read(socket.BufferLength)
+        jsonData, err = decode(data)
+        if err == nil then
+          if jsonData.system then
+            if jsonData.system.get_sysinfo then
+              if jsonData.system.get_sysinfo.err_code == 0 then
+                Controls["Device_" .. x .. "_Status"].Value = 0 --ok
+                Controls["Device_" .. x .. "_Status"].String = ""
+              end
+              parseGetInfo(x, jsonData.system.get_sysinfo)
+            elseif jsonData.system.set_relay_state then
+              DevicePoll(x)
+            end
+          elseif jsonData["smartlife.iot.dimmer"] then
+          -- Poll()
+          end
+        else
+          print("JSON Err:", err)
+          print(decodeToString(data))
+          Controls["Device_" .. x .. "_Status"].Value = 2 --fault
+          Controls["Device_" .. x .. "_Status"].String = "JSON Error: ", err
+        end
+      elseif event == TcpSocket.Events.Connected then
+        DevicePoll(x)
+        Timers[x]:Start(PollTime)
+      else
+        Timers[x]:Stop()
+        Controls["Device_" .. x .. "_Status"].Value = 4 --missing
+        Controls["Device_" .. x .. "_Status"].String = event
+      end
+    end
+  
+    Controls["Device_" .. x .. "_IP"].EventHandler = function(ctrl)
+      DeviceDisconnect(x)
+      if ctrl.String ~= "" then
+        DeviceConnect(x)    
+      end
+    end
+  
+    Controls["Device_" .. x .. "_On"].EventHandler = function(ctrl)
+      if Sockets[x].IsConnected then
+        if DebugTx then
+          print("Device" .. x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":1 } } }')
+        end
+        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":1 } } }'))
+      end
+    end
+    Controls["Device_" .. x .. "_Off"].EventHandler = function(ctrl)
+      if Sockets[x].IsConnected then
+        if DebugTx then
+          print("Device" .. x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":0 } } }')
+        end
+        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":0 } } }'))
+      end
+    end
+    Controls["Device_" .. x .. "_Toggle"].EventHandler = function(ctrl)
+      if Sockets[x].IsConnected then
+        if DebugTx then
+          print("Device" .. x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":'..(ctrl.Boolean and 1 or 0)..' } } }')
+        end
+        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":'..(ctrl.Boolean and 1 or 0)..' } } }'))
+      end
+    end
+    Controls["Device_" .. x .. "_Brightness"].EventHandler = function(ctrl)
+      FaderDebounce[x]:Stop()
+      FaderDebounce[x]:Start(0.1)
+    end
+    FaderDebounce[x].EventHandler = function()
+      FaderDebounce[x]:Stop()
+      if Sockets[x].IsConnected then
+        val = math.floor(Controls["Device_" .. x .. "_Brightness"].Value)
+        if DebugTx then
+          print("Device" .. x .. " TX: " .. '{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":'..val..' } } }')
+        end
+        Sockets[x]:Write(encode('{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":'..val..' } } }'))
+      end
+    end
   end
   
-  DiscoverySocket = UdpSocket.New()
-  DiscoverySocket.EventHandler = function(socket, packet)  
-    data = decode(packet.Data,true)
-    if data.system.get_sysinfo.alias then 
-      -- print(decodeToString(packet.Data,true))
-      print(data.system.get_sysinfo.alias.."["..data.system.get_sysinfo.model.."] - "..packet.Address)
-      if DiscoveredDevices[data.system.get_sysinfo.mac] == nil then
-        DiscoveredDevices[data.system.get_sysinfo.mac] = {}
-      end
-      DiscoveredDevices[data.system.get_sysinfo.mac].alias = data.system.get_sysinfo.alias
-      DiscoveredDevices[data.system.get_sysinfo.mac].model = data.system.get_sysinfo.model
-      DiscoveredDevices[data.system.get_sysinfo.mac].ip = packet.Address
-    end 
-    RenderDiscoveredDevices()
-  end 
+  function ClearDeviceVariables(index)
+    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
+      Controls["Device_" .. index .. "_Status"].Value = 3
+      Controls["Device_" .. index .. "_Status"].String = ""
+      Controls["Device_" .. index .. "_On"].Boolean = false
+      Controls["Device_" .. index .. "_Off"].Boolean = false
+    end
+  end
+  function ClearVariables()
+    for d = 1, NumberOfDevices do
+      ClearDeviceVariables(d)
+    end
+  end
   
-  DiscoverySocket:Open("",9999)
-  Controls.Discover.EventHandler = function()
-    print("Sending Discovery packet")
-    DiscoveredDevices = {}
-    RenderDiscoveredDevices()
-    DiscoverySocket:Send("255.255.255.255",9999,"\xd0\xf2\x81\xf8\x8b\xff\x9a\xf7\xd5\xef\x94\xb6\xd1\xb4\xc0\x9f\xec\x95\xe6\x8f\xe1\x87\xe8\xca\xf0\x8b\xf6\x8b\xf6")
-  end 
+  function DeviceConnect(index)
+    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
+      local ip = Controls["Device_" .. index .. "_IP"].String
+      Timers[index]:Stop()
+      if ip ~= nil and ip ~= "" then
+        Sockets[index]:Connect(ip, 9999)
+      else
+        Controls["Device_" .. index .. "_Status"].Value = 3 --not present
+        Controls["Device_" .. index .. "_Status"].String = "No IP Address"
+      end
+    end
+  end
+  function DeviceDisconnect(index)
+    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
+      Timers[index]:Stop()
+      Sockets[index]:Disconnect()
+      -- Controls["Device_" .. index .. "_Status"].Value = 3 --not present
+      -- Controls["Device_" .. index .. "_Status"].String = "Disconnected"
+    end
+  end
+  function DevicePoll(index)
+    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
+      if Sockets[index].IsConnected then
+        if DebugTx then
+          print("Device" .. index .. " TX: " .. '{ "system":{ "get_sysinfo":null } }')
+        end
+        Sockets[index]:Write(encode('{ "system":{ "get_sysinfo":null } }'))
+      end
+    end
+  end
+  
+  function parseGetInfo(index, data)
+    local Meter = Controls["Device_" .. index .. "_Brightness"]
+    if data.brightness then
+      Meter.IsInvisible = false
+      Meter.Value = data.brightness
+    else
+      Meter.IsInvisible = true
+    end
+    local On = Controls["Device_" .. index .. "_On"]
+    local Off = Controls["Device_" .. index .. "_Off"]
+    local Toggle = Controls["Device_" .. index .. "_Toggle"]
+    if data.relay_state then
+      On.Boolean = data.relay_state == 1
+      Off.Boolean = data.relay_state == 0
+      Toggle.Boolean = data.relay_state == 1
+    end
+  
+    -- Device Info
+    if data.alias then
+      Controls["Device_" .. index .. "_Name"].String = data.alias
+    end
+    if data.model then
+      Controls["Device_" .. index .. "_Model"].String = data.model
+    end
+    if data.mac then
+      Controls["Device_" .. index .. "_Mac"].String = data.mac
+    end
+    if data.sw_ver then
+      Controls["Device_" .. index .. "_Firmware"].String = data.hw_ver
+    end
+    if data.rssi then
+      Controls["Device_" .. index .. "_Rssi"].String = data.rssi
+    end
+  end
+  
+  
+  function Init()
+    ClearVariables()
+    for d = 1, NumberOfDevices do
+      DeviceConnect(d)
+    end
+  end
+  
+  Init()
 end
