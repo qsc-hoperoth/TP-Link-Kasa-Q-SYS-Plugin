@@ -6,9 +6,9 @@ local Colors = {
   Green = {0, 255, 0},
   Blue = {0, 0, 255},
   Gray = {136, 136, 136},
-  LightGray = {51,51,51},
-  KasaBlue = {74,203,214},
-  PluginColor = {74,203,214}
+  LightGray = {51, 51, 51},
+  KasaBlue = {74, 203, 214},
+  PluginColor = {74, 203, 214}
 }
 
 local MaxDevices = 24
@@ -25,10 +25,13 @@ function GetPrettyName(props)
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Central Control","Discovery"} --List the pages within the plugin
+PageNames = {"Central Control", "Discovery"} --List the pages within the plugin
 function PopulatePageNames(props)
-  for x = 1, props["Number Of Devices"].Value do
+  for x = 1, props["Number Of Single Endpoints"].Value do
     table.insert(PageNames, "Device " .. x)
+  end
+  for x = 1, props["Number Of Multi Endpoints"].Value do
+    table.insert(PageNames, "Strip " .. x)
   end
 end
 
@@ -89,5 +92,5 @@ end
 
 --Start event based logic
 if Controls then
-  --[[ #include "runtime.lua" ]]
+--[[ #include "runtime.lua" ]]
 end

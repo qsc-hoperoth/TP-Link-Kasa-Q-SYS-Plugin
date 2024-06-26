@@ -1,7 +1,7 @@
 PluginInfo = {
   Name = "TP-Link Kasa Local TCP",
   Author = "Eugene Dunn",
-  BuildVersion = "0.1.1.2",
+  BuildVersion = "0.3.1.10",
   Version = "0.1",
   Id = "d71cb671-6e0a-4a35-9ca4-20a247089870",
   Description = ""
@@ -13,9 +13,9 @@ local Colors = {
   Green = {0, 255, 0},
   Blue = {0, 0, 255},
   Gray = {136, 136, 136},
-  LightGray = {51,51,51},
-  KasaBlue = {74,203,214},
-  PluginColor = {74,203,214}
+  LightGray = {51, 51, 51},
+  KasaBlue = {74, 203, 214},
+  PluginColor = {74, 203, 214}
 }
 
 local MaxDevices = 24
@@ -32,10 +32,13 @@ function GetPrettyName(props)
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Central Control","Discovery"} --List the pages within the plugin
+PageNames = {"Central Control", "Discovery"} --List the pages within the plugin
 function PopulatePageNames(props)
-  for x = 1, props["Number Of Devices"].Value do
+  for x = 1, props["Number Of Single Endpoints"].Value do
     table.insert(PageNames, "Device " .. x)
+  end
+  for x = 1, props["Number Of Multi Endpoints"].Value do
+    table.insert(PageNames, "Strip " .. x)
   end
 end
 
@@ -51,22 +54,45 @@ end
 -- Define User configurable Properties of the plugin
 function GetProperties()
   local props = {}
-  table.insert (
+  table.insert(
     props,
     {
-      Name = "Number Of Devices",
+      Name = "Number Of Single Endpoints",
       Type = "integer",
-      Min = 1,
+      Min = 0,
       Max = MaxDevices,
       Value = 1
     }
   )
-  table.insert(props, {
-    Name = "Debug Print",
-    Type = "enum",
-    Choices = {"None", "Tx/Rx", "Tx", "Rx", "Function Calls", "All"},
-    Value = "None"
-  })
+  table.insert(
+    props,
+    {
+      Name = "Number Of Multi Endpoints",
+      Type = "integer",
+      Min = 0,
+      Max = MaxDevices,
+      Value = 0
+    }
+  )
+  table.insert(
+    props,
+    {
+      Name = "Poll Time",
+      Type = "integer",
+      Min = 1,
+      Max = 60,
+      Value = 5
+    }
+  )
+  table.insert(
+    props,
+    {
+      Name = "Debug Print",
+      Type = "enum",
+      Choices = {"None", "Tx/Rx", "Tx", "Rx", "Function Calls", "All"},
+      Value = "None"
+    }
+  )
   return props
 end
 
@@ -101,7 +127,8 @@ function GetControls(props)
   local ctrls = {}
   -- table.insert(ctrls,{Name = "code",ControlType = "Text",PinStyle = "Input",Count = 1})
   
-  NumberOfDevices = props["Number Of Devices"].Value
+  local NumberOfDevices = props["Number Of Single Endpoints"].Value
+  local NumberOfStrips = props["Number Of Multi Endpoints"].Value
   
   table.insert(
     ctrls,
@@ -191,9 +218,8 @@ function GetControls(props)
       ctrls,
       {
         Name = "Device_" .. d .. "_Name",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
+        ControlType = "Text",
+        PinStyle = "Both",
         UserPin = true
       }
     )
@@ -237,6 +263,178 @@ function GetControls(props)
         UserPin = true
       }
     )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Voltage",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Current",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Device_" .. d .. "_Power",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+  end
+  for d = 1, NumberOfStrips do
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_IP",
+        ControlType = "Text",
+        PinStyle = "Both",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_Status",
+        ControlType = "Indicator",
+        IndicatorType = "Status",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_Name",
+        ControlType = "Text",
+        PinStyle = "Both",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_Model",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_Mac",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_Firmware",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+    table.insert(
+      ctrls,
+      {
+        Name = "Strip_" .. d .. "_Rssi",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true
+      }
+    )
+  
+    for p = 1, 6 do -- Per Plug
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_On",
+          ControlType = "Button",
+          ButtonType = "Toggle",
+          PinStyle = "Both",
+          UserPin = true
+        }
+      )
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Off",
+          ControlType = "Button",
+          ButtonType = "Toggle",
+          PinStyle = "Both",
+          UserPin = true
+        }
+      )
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Toggle",
+          ControlType = "Button",
+          ButtonType = "Toggle",
+          PinStyle = "Both",
+          UserPin = true
+        }
+      )
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Name",
+          ControlType = "Text",
+          PinStyle = "Both",
+          UserPin = true
+        }
+      )
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Voltage",
+          ControlType = "Indicator",
+          IndicatorType = "Text",
+          PinStyle = "Output",
+          UserPin = true
+        }
+      )
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Current",
+          ControlType = "Indicator",
+          IndicatorType = "Text",
+          PinStyle = "Output",
+          UserPin = true
+        }
+      )
+      table.insert(
+        ctrls,
+        {
+          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Power",
+          ControlType = "Indicator",
+          IndicatorType = "Text",
+          PinStyle = "Output",
+          UserPin = true
+        }
+      )
+    end
   end
   return ctrls
 end
@@ -250,7 +448,8 @@ function GetControlLayout(props)
   local x, y = 0, 10
   
   local current_page = props["page_index"].Value
-  local NumberOfDevices = props["Number Of Devices"].Value
+  local NumberOfDevices = props["Number Of Single Endpoints"].Value
+  local NumberOfStrips = props["Number Of Multi Endpoints"].Value
   
   if current_page == 2 then --Setup
     layout["Discover"] = {
@@ -311,7 +510,7 @@ function GetControlLayout(props)
         Position = {x, y},
         Size = {150, 20},
         Text = "Name",
-        FontSize = 12
+        FontSize = 9
       }
     )
     x = x + 150
@@ -363,7 +562,7 @@ function GetControlLayout(props)
         Position = {x, y},
         Size = {150, 20},
         Style = "Text",
-        FontSize = 12
+        FontSize = 9
       }
       x = x + 150
       layout["Device_" .. d .. "_Name"] = {
@@ -371,7 +570,7 @@ function GetControlLayout(props)
         Position = {x, y},
         Size = {150, 20},
         Style = "Text",
-        FontSize = 12
+        FontSize = 9
       }
       x = x + 150
       layout["Device_" .. d .. "_Toggle"] = {
@@ -391,10 +590,176 @@ function GetControlLayout(props)
         Style = "Text",
         FontSize = 12
       }
-  
+    end
+    if NumberOfStrips > 0 then
+      x = 0
+      y = y + 20
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {40, 20},
+          Text = "Strip",
+          FontSize = 12
+        }
+      )
+      x = x + 40
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {125, 20},
+          Text = "IP Address",
+          FontSize = 12
+        }
+      )
+      x = x + 125
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {150, 20},
+          Text = "Status",
+          FontSize = 12
+        }
+      )
+      x = x + 150
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {150, 20},
+          Text = "Name",
+          FontSize = 9
+        }
+      )
+      x = x + 150
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Plug 1",
+          FontSize = 12
+        }
+      )
+      x = x + 75
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Plug 2",
+          FontSize = 12
+        }
+      )
+      x = x + 75
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Plug 3",
+          FontSize = 12
+        }
+      )
+      x = x + 75
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Plug 4",
+          FontSize = 12
+        }
+      )
+      x = x + 75
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Plug 5",
+          FontSize = 12
+        }
+      )
+      x = x + 75
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Plug 6",
+          FontSize = 12
+        }
+      )
+      for d = 1, NumberOfStrips do
+        x = 0
+        y = y + 20
+        table.insert(
+          graphics,
+          {
+            Type = "Label",
+            Position = {x, y},
+            Size = {40, 20},
+            Text = tostring(d),
+            FontSize = 12
+          }
+        )
+        x = x + 40
+        layout["Strip_" .. d .. "_IP"] = {
+          PrettyName = "Strip" .. d .. "~IP Address",
+          Position = {x, y},
+          Size = {125, 20},
+          Style = "Text",
+          FontSize = 12
+        }
+        x = x + 125
+        layout["Strip_" .. d .. "_Status"] = {
+          PrettyName = "Strip" .. d .. "~Status",
+          Position = {x, y},
+          Size = {150, 20},
+          Style = "Text",
+          FontSize = 9
+        }
+        x = x + 150
+        layout["Strip_" .. d .. "_Name"] = {
+          PrettyName = "Strip" .. d .. "~Name",
+          Position = {x, y},
+          Size = {150, 20},
+          Style = "Text",
+          FontSize = 9
+        }
+        x = x + 150
+        for p = 1, 6 do
+          layout["Strip_" .. d .. "_Plug_" .. p .. "_Toggle"] = {
+            PrettyName = "Strip" .. d .. "~Plug " .. p .. "~Toggle",
+            Position = {x, y},
+            Size = {75, 20},
+            Style = "Button",
+            Legend = "Toggle",
+            FontSize = 12,
+            Margin = 0
+          }
+          x = x + 75
+        end
+      end
     end
   else
     local index = current_page - 2
+    prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
+    prettyNamePrefix = (index <= NumberOfDevices) and "Device" .. index or "Strip" .. (index - NumberOfDevices)
+    isStrip = (index > NumberOfDevices)
     table.insert(
       graphics,
       {
@@ -420,8 +785,8 @@ function GetControlLayout(props)
         FontSize = 12
       }
     )
-    layout["Device_" .. index .. "_IP"] = {
-      PrettyName = "Device" .. index .. "~IP Address",
+    layout[prefix .. "_IP"] = {
+      PrettyName = prettyNamePrefix .. "~IP Address",
       Position = {x, y + 20},
       Size = {125, 20},
       Style = "Text",
@@ -438,8 +803,8 @@ function GetControlLayout(props)
         FontSize = 12
       }
     )
-    layout["Device_" .. index .. "_Status"] = {
-      PrettyName = "Device" .. index .. "~Status",
+    layout[prefix .. "_Status"] = {
+      PrettyName = prettyNamePrefix .. "~Status",
       Position = {x, y + 20},
       Size = {150, 20},
       Style = "Text",
@@ -447,476 +812,1032 @@ function GetControlLayout(props)
     }
     x = 0
     y = 90
-    table.insert(
-      graphics,
-      {
-        Type = "GroupBox",
-        Position = {x, y},
-        Size = {100, 200},
-        Text = "Control",
-        FontSize = 12,
-        StrokeColor = Colors.Black,
-        StrokeWidth = 1,
-        CornerRadius = 5
-      }
-    )
-    table.insert(
-      graphics,
-      {
-        Type = "GroupBox",
-        Position = {x + 110, y},
-        Size = {190, 200},
-        Text = "Device Info",
-        FontSize = 12,
-        StrokeColor = Colors.Black,
-        StrokeWidth = 1,
-        CornerRadius = 5
-      }
-    )
-    --Control
-    x = 5
-    y = y + 20
-    TopY = y
+    if isStrip then
+      table.insert(
+        graphics,
+        {
+          Type = "GroupBox",
+          Position = {x, y},
+          Size = {190, 150},
+          Text = "Device Info",
+          FontSize = 12,
+          StrokeColor = Colors.Black,
+          StrokeWidth = 1,
+          CornerRadius = 5
+        }
+      )
   
-    layout["Device_" .. index .. "_On"] = {
-      PrettyName = "Device" .. index .. "~On",
-      Position = {x, y},
-      Size = {40, 40},
-      Style = "Button",
-      Legend = "On",
-      FontSize = 12
-    }
-    x = x + 50
-    layout["Device_" .. index .. "_Off"] = {
-      PrettyName = "Device" .. index .. "~Off",
-      Position = {x, y},
-      Size = {40, 40},
-      Style = "Button",
-      Legend = "Off",
-      FontSize = 12
-    }
-    x = 5
-    y = y + 50
-    layout["Device_" .. index .. "_Toggle"] = {
-      PrettyName = "Device" .. index .. "~Toggle",
-      Position = {x, y},
-      Size = {90, 40},
-      Style = "Button",
-      Legend = "Toggle",
-      FontSize = 12
-    }
-    y = y + 50
-    layout["Device_" .. index .. "_Brightness"] = {
-      PrettyName = "Device" .. index .. "~Brightness",
-      Position = {x, y},
-      Size = {90, 80},
-      Style = "Knob",
-      FontSize = 12
-    }
+      --Device Info
+      x = x + 5
+      y = y + 20
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Name",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Name"] = {
+        PrettyName = prettyNamePrefix .. "~Name",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Model",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Model"] = {
+        PrettyName = prettyNamePrefix .. "~Model",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Mac Address",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Mac"] = {
+        PrettyName = prettyNamePrefix .. "~Mac Address",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 9
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Firmware",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Firmware"] = {
+        PrettyName = prettyNamePrefix .. "~Firmware",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "RSSI",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Rssi"] = {
+        PrettyName = prettyNamePrefix .. "~RSSI",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
   
-    --Device Info
-    x = x + 110
-    y = TopY
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
+      -- Plugs
+      x = x + 200
+      for p = 1, 6 do
+        y = 90
+        table.insert(
+          graphics,
+          {
+            Type = "GroupBox",
+            Position = {x, y},
+            Size = {90, 215},
+            Text = "Plug " .. p,
+            FontSize = 12,
+            StrokeColor = Colors.Black,
+            StrokeWidth = 1,
+            CornerRadius = 5
+          }
+        )
+        y = y + 20
+        layout[prefix .. "_Plug_" .. p .. "_Name"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Name",
+          Position = {x + 5, y},
+          Size = {80, 20},
+          Style = "Text",
+          FontSize = 9
+        }
+        y = y + 25
+        layout[prefix .. "_Plug_" .. p .. "_On"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~On",
+          Position = {x + 5, y},
+          Size = {40, 40},
+          Style = "Button",
+          Legend = "On",
+          FontSize = 12
+        }
+        -- y = y + 50
+        layout[prefix .. "_Plug_" .. p .. "_Off"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Off",
+          Position = {x + 45, y},
+          Size = {40, 40},
+          Style = "Button",
+          Legend = "Off",
+          FontSize = 12
+        }
+        y = y + 45
+        layout[prefix .. "_Plug_" .. p .. "_Toggle"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Toggle",
+          Position = {x + 5, y},
+          Size = {80, 40},
+          Style = "Button",
+          Legend = "Toggle",
+          FontSize = 12
+        }
+        y = y + 50
+        layout[prefix .. "_Plug_" .. p .. "_Voltage"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Voltage",
+          Position = {x + 5, y},
+          Size = {80, 20},
+          Style = "Text",
+          FontSize = 12
+        }
+        y = y + 25
+        layout[prefix .. "_Plug_" .. p .. "_Current"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Current",
+          Position = {x + 5, y},
+          Size = {80, 20},
+          Style = "Text",
+          FontSize = 12
+        }
+        y = y + 25
+        layout[prefix .. "_Plug_" .. p .. "_Power"] = {
+          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Power",
+          Position = {x + 5, y},
+          Size = {80, 20},
+          Style = "Text",
+          FontSize = 12
+        }
+        x = x + 100
+      end
+    else
+      table.insert(
+        graphics,
+        {
+          Type = "GroupBox",
+          Position = {x, y},
+          Size = {100, 225},
+          Text = "Control",
+          FontSize = 12,
+          StrokeColor = Colors.Black,
+          StrokeWidth = 1,
+          CornerRadius = 5
+        }
+      )
+      table.insert(
+        graphics,
+        {
+          Type = "GroupBox",
+          Position = {x + 110, y},
+          Size = {190, 225},
+          Text = "Device Info",
+          FontSize = 12,
+          StrokeColor = Colors.Black,
+          StrokeWidth = 1,
+          CornerRadius = 5
+        }
+      )
+      --Control
+      x = 5
+      y = y + 20
+      TopY = y
+      layout[prefix .. "_On"] = {
+        PrettyName = prettyNamePrefix .. "~On",
         Position = {x, y},
-        Size = {75, 20},
-        Text = "Name",
-        FontSize = 12,
-        HTextAlign = "Right"
+        Size = {40, 40},
+        Style = "Button",
+        Legend = "On",
+        FontSize = 12
       }
-    )
-    layout["Device_" .. index .. "_Name"] = {
-      PrettyName = "Device" .. index .. "~Name",
-      Position = {x + 80, y},
-      Size = {100, 20},
-      Style = "Text",
-      FontSize = 12
-    }
-    y = y + 25
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
+      x = x + 50
+      layout[prefix .. "_Off"] = {
+        PrettyName = prettyNamePrefix .. "~Off",
         Position = {x, y},
-        Size = {75, 20},
-        Text = "Model",
-        FontSize = 12,
-        HTextAlign = "Right"
+        Size = {40, 40},
+        Style = "Button",
+        Legend = "Off",
+        FontSize = 12
       }
-    )
-    layout["Device_" .. index .. "_Model"] = {
-      PrettyName = "Device" .. index .. "~Model",
-      Position = {x + 80, y},
-      Size = {100, 20},
-      Style = "Text",
-      FontSize = 12
-    }
-    y = y + 25
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
+      x = 5
+      y = y + 50
+      layout[prefix .. "_Toggle"] = {
+        PrettyName = prettyNamePrefix .. "~Toggle",
         Position = {x, y},
-        Size = {75, 20},
-        Text = "Mac Address",
-        FontSize = 12,
-        HTextAlign = "Right"
+        Size = {90, 40},
+        Style = "Button",
+        Legend = "Toggle",
+        FontSize = 12
       }
-    )
-    layout["Device_" .. index .. "_Mac"] = {
-      PrettyName = "Device" .. index .. "~Mac Address",
-      Position = {x + 80, y},
-      Size = {100, 20},
-      Style = "Text",
-      FontSize = 9
-    }
-    y = y + 25
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
+      y = y + 50
+      layout[prefix .. "_Brightness"] = {
+        PrettyName = prettyNamePrefix .. "~Brightness",
         Position = {x, y},
-        Size = {75, 20},
-        Text = "Firmware",
-        FontSize = 12,
-        HTextAlign = "Right"
+        Size = {90, 80},
+        Style = "Knob",
+        FontSize = 12
       }
-    )
-    layout["Device_" .. index .. "_Firmware"] = {
-      PrettyName = "Device" .. index .. "~Firmware",
-      Position = {x + 80, y},
-      Size = {100, 20},
-      Style = "Text",
-      FontSize = 12
-    }
-    y = y + 25
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
-        Position = {x, y},
-        Size = {75, 20},
-        Text = "RSSI",
-        FontSize = 12,
-        HTextAlign = "Right"
+  
+      --Device Info
+      x = x + 110
+      y = TopY
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Name",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Name"] = {
+        PrettyName = prettyNamePrefix .. "~Name",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
       }
-    )
-    layout["Device_" .. index .. "_Rssi"] = {
-      PrettyName = "Device" .. index .. "~RSSI",
-      Position = {x + 80, y},
-      Size = {100, 20},
-      Style = "Text",
-      FontSize = 12
-    }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Model",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Model"] = {
+        PrettyName = prettyNamePrefix .. "~Model",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Mac Address",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Mac"] = {
+        PrettyName = prettyNamePrefix .. "~Mac Address",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 9
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Firmware",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Firmware"] = {
+        PrettyName = prettyNamePrefix .. "~Firmware",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "RSSI",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Rssi"] = {
+        PrettyName = prettyNamePrefix .. "~RSSI",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Voltage",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Voltage"] = {
+        PrettyName = prettyNamePrefix .. "~Voltage",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Current",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Current"] = {
+        PrettyName = prettyNamePrefix .. "~Current",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+      y = y + 25
+      table.insert(
+        graphics,
+        {
+          Type = "Label",
+          Position = {x, y},
+          Size = {75, 20},
+          Text = "Power",
+          FontSize = 12,
+          HTextAlign = "Right"
+        }
+      )
+      layout[prefix .. "_Power"] = {
+        PrettyName = prettyNamePrefix .. "~Power",
+        Position = {x + 80, y},
+        Size = {100, 20},
+        Style = "Text",
+        FontSize = 12
+      }
+    end
   end
   return layout, graphics
 end
 
 --Start event based logic
 if Controls then
-  rapidjson = require("rapidjson")
-  
-  NumberOfDevices = Properties["Number Of Devices"].Value
-  
-  DebugTx, DebugRx, DebugFunction = false, false, false
-  DebugPrint = Properties["Debug Print"].Value
-  if DebugPrint == "Tx/Rx" then
-    DebugTx, DebugRx = true, true
-  elseif DebugPrint == "Tx" then
-    DebugTx = true
-  elseif DebugPrint == "Rx" then
-    DebugRx = true
-  elseif DebugPrint == "Function Calls" then
-    DebugFunction = true
-  elseif DebugPrint == "All" then
-    DebugTx, DebugRx, DebugFunction = true, true, true
+rapidjson = require("rapidjson")
+
+NumberOfDevices = Properties["Number Of Single Endpoints"].Value
+NumberOfStrips = Properties["Number Of Multi Endpoints"].Value
+
+DebugTx, DebugRx, DebugFunction = false, false, false
+DebugPrint = Properties["Debug Print"].Value
+if DebugPrint == "Tx/Rx" then
+  DebugTx, DebugRx = true, true
+elseif DebugPrint == "Tx" then
+  DebugTx = true
+elseif DebugPrint == "Rx" then
+  DebugRx = true
+elseif DebugPrint == "Function Calls" then
+  DebugFunction = true
+elseif DebugPrint == "All" then
+  DebugTx, DebugRx, DebugFunction = true, true, true
+end
+
+StatusState = {OK = 0, COMPROMISED = 1, FAULT = 2, NOTPRESENT = 3, MISSING = 4, INITIALIZING = 5}
+
+function decode(buf, udp)
+  local ascii = ""
+  local hex = ""
+  -- Decryption key is -85 (256-85=171)
+  local key = 171
+  -- Decrypt Autokey XOR
+  -- Skip first 4 bytes (header)
+  for index = (udp and 1 or 5), #buf do
+    local c = buf:byte(index)
+    -- XOR first byte with key
+    d = c ~ key
+    -- Use byte as next key
+    key = c
+    hex = hex .. string.format("%x ", d)
+    -- Convert to printable characters
+    if d >= 0x20 and d <= 0x7E then
+      ascii = ascii .. string.format("%c", d)
+    else
+      -- Use dot for non-printable bytes
+      ascii = ascii .. "."
+    end
   end
-  
-  StatusState = {OK = 0, COMPROMISED = 1, FAULT = 2, NOTPRESENT = 3, MISSING = 4, INITIALIZING = 5}
-  
-    function decode(buf, udp)
-      local ascii = ""
-      local hex = ""
-      -- Decryption key is -85 (256-85=171)
-      local key = 171
-      -- Decrypt Autokey XOR
-      -- Skip first 4 bytes (header)
-      for index = (udp and 1 or 5), #buf do
-        local c = buf:byte(index)
-        -- XOR first byte with key
-        d = c ~ key
-        -- Use byte as next key
-        key = c
-        hex = hex .. string.format("%x ", d)
-        -- Convert to printable characters
-        if d >= 0x20 and d <= 0x7E then
-          ascii = ascii .. string.format("%c", d)
-        else
-          -- Use dot for non-printable bytes
-          ascii = ascii .. "."
-        end
-      end
-      -- print(hex)
-      -- print(ascii)
-      return rapidjson.decode(ascii)
-    end 
-    function decodeToString(buf, udp)
-      local ascii = ""
-      local hex = ""
-      -- Decryption key is -85 (256-85=171)
-      local key = 171
-      -- Decrypt Autokey XOR
-      -- Skip first 4 bytes (header)
-      for index = (udp and 1 or 5), #buf do
-        local c = buf:byte(index)
-        -- XOR first byte with key
-        d = c ~ key
-        -- Use byte as next key
-        key = c
-        hex = hex .. string.format("%x ", d)
-        -- Convert to printable characters
-        if d >= 0x20 and d <= 0x7E then
-          ascii = ascii .. string.format("%c", d)
-        else
-          -- Use dot for non-printable bytes
-          ascii = ascii .. "."
-        end
-      end
-      -- print(hex)
-      -- print(ascii)
-      -- return rapidjson.decode(ascii)
-      return ascii
-    end 
-    
-    function encode(message)
-      local key = 171
-      result = string.pack(">I",#message)
-      for i = 1, #message do 
-        a = key ~ message:byte(i)
-        key = a
-        result = result .. string.char(a)
-      end 
-      return result
-    end 
-    local DiscoveredDevices = {}
-    
-    function RenderDiscoveredDevices()
-      Controls["Discovered Devices"].String = ""
-      local toPrint = ""
-      for _, device in pairs(DiscoveredDevices) do
-        toPrint = toPrint..device.alias.."["..device.model.."] - "..device.ip.."\n"
-      end
-      Controls["Discovered Devices"].String = toPrint
+  -- print(hex)
+  -- print(ascii)
+  return rapidjson.decode(ascii)
+end 
+function decodeToString(buf, udp)
+  local ascii = ""
+  local hex = ""
+  -- Decryption key is -85 (256-85=171)
+  local key = 171
+  -- Decrypt Autokey XOR
+  -- Skip first 4 bytes (header)
+  for index = (udp and 1 or 5), #buf do
+    local c = buf:byte(index)
+    -- XOR first byte with key
+    d = c ~ key
+    -- Use byte as next key
+    key = c
+    hex = hex .. string.format("%x ", d)
+    -- Convert to printable characters
+    if d >= 0x20 and d <= 0x7E then
+      ascii = ascii .. string.format("%c", d)
+    else
+      -- Use dot for non-printable bytes
+      ascii = ascii .. "."
     end
-    
-    DiscoverySocket = UdpSocket.New()
-    DiscoverySocket.EventHandler = function(socket, packet)  
-      data = decode(packet.Data,true)
-      if data.system.get_sysinfo.alias then 
-        print(decodeToString(packet.Data,true))
-        print(data.system.get_sysinfo.alias.."["..data.system.get_sysinfo.model.."] - "..packet.Address)
-        if DiscoveredDevices[data.system.get_sysinfo.mac] == nil then
-          DiscoveredDevices[data.system.get_sysinfo.mac] = {}
-        end
-        DiscoveredDevices[data.system.get_sysinfo.mac].alias = data.system.get_sysinfo.alias
-        DiscoveredDevices[data.system.get_sysinfo.mac].model = data.system.get_sysinfo.model
-        DiscoveredDevices[data.system.get_sysinfo.mac].ip = packet.Address
-      end 
-      RenderDiscoveredDevices()
-    end 
-    
-    DiscoverySocket:Open("",9999)
-    Controls.Discover.EventHandler = function()
-      print("Sending Discovery packet")
-      DiscoveredDevices = {}
-      RenderDiscoveredDevices()
-      DiscoverySocket:Send("255.255.255.255",9999,"\xd0\xf2\x81\xf8\x8b\xff\x9a\xf7\xd5\xef\x94\xb6\xd1\xb4\xc0\x9f\xec\x95\xe6\x8f\xe1\x87\xe8\xca\xf0\x8b\xf6\x8b\xf6")
-    end 
-  Sockets = {}
-  Timers = {}
-  FaderDebounce = {}
-  local PollTime = 5
-  
-  for x = 1, NumberOfDevices do
-    table.insert(Sockets, TcpSocket.New())
-    table.insert(Timers, Timer.New())
-    table.insert(FaderDebounce, Timer.New())
-  
-    Timers[x].EventHandler = function()
-      DevicePoll(x)
+  end
+  -- print(hex)
+  -- print(ascii)
+  -- return rapidjson.decode(ascii)
+  return ascii
+end 
+
+function encode(message)
+  local key = 171
+  result = string.pack(">I",#message)
+  for i = 1, #message do 
+    a = key ~ message:byte(i)
+    key = a
+    result = result .. string.char(a)
+  end 
+  return result
+end 
+local DiscoveredDevices = {}
+
+function RenderDiscoveredDevices()
+  Controls["Discovered Devices"].String = ""
+  local toPrint = ""
+  for _, device in pairs(DiscoveredDevices) do
+    toPrint = toPrint..device.alias.."["..device.model.."] - "..device.ip.."\n"
+  end
+  Controls["Discovered Devices"].String = toPrint
+end
+
+DiscoverySocket = UdpSocket.New()
+DiscoverySocket.EventHandler = function(socket, packet)  
+  data = decode(packet.Data,true)
+  if data.system.get_sysinfo.alias then 
+    print(decodeToString(packet.Data,true))
+    print(data.system.get_sysinfo.alias.."["..data.system.get_sysinfo.model.."] - "..packet.Address)
+    if DiscoveredDevices[data.system.get_sysinfo.mac] == nil then
+      DiscoveredDevices[data.system.get_sysinfo.mac] = {}
     end
-    Sockets[x].EventHandler = function(socket, event, err)
-      -- print(event)
-      if event == TcpSocket.Events.Data then
-        data = socket:Read(socket.BufferLength)
-        jsonData, err = decode(data)
-        if err == nil then
-          if jsonData.system then
-            if jsonData.system.get_sysinfo then
-              if jsonData.system.get_sysinfo.err_code == 0 then
-                Controls["Device_" .. x .. "_Status"].Value = 0 --ok
-                Controls["Device_" .. x .. "_Status"].String = ""
-              end
-              parseGetInfo(x, jsonData.system.get_sysinfo)
-            elseif jsonData.system.set_relay_state then
-              DevicePoll(x)
+    DiscoveredDevices[data.system.get_sysinfo.mac].alias = data.system.get_sysinfo.alias
+    DiscoveredDevices[data.system.get_sysinfo.mac].model = data.system.get_sysinfo.model
+    DiscoveredDevices[data.system.get_sysinfo.mac].ip = packet.Address
+  end 
+  RenderDiscoveredDevices()
+end 
+
+DiscoverySocket:Open("",9999)
+Controls.Discover.EventHandler = function()
+  print("Sending Discovery packet")
+  DiscoveredDevices = {}
+  RenderDiscoveredDevices()
+  DiscoverySocket:Send("255.255.255.255",9999,"\xd0\xf2\x81\xf8\x8b\xff\x9a\xf7\xd5\xef\x94\xb6\xd1\xb4\xc0\x9f\xec\x95\xe6\x8f\xe1\x87\xe8\xca\xf0\x8b\xf6\x8b\xf6")
+end 
+Sockets = {}
+Timers = {}
+FaderDebounce = {}
+local PollTime = Properties["Poll Time"].Value
+
+local Devices = {}
+
+for x = 1, NumberOfDevices + NumberOfStrips do
+  local prefix = (x <= NumberOfDevices) and "Device_" .. x or "Strip_" .. (x - NumberOfDevices)
+  local isStrip = (x > NumberOfDevices)
+  table.insert(Sockets, TcpSocket.New())
+  table.insert(Timers, Timer.New())
+  table.insert(FaderDebounce, Timer.New())
+  Devices[x] = {}
+  Devices[x].Buffer = ""
+  Devices[x].Info = {}
+  Devices[x].Energy = {}
+
+  Timers[x].EventHandler = function()
+    DevicePoll(x)
+  end
+  Sockets[x].EventHandler = function(socket, event, err)
+    -- print(event)
+    print(prefix .. " got " .. socket.BufferLength .. " bytes")
+    if event == TcpSocket.Events.Data then
+      Devices[x].Buffer = Devices[x].Buffer .. socket:Read(socket.BufferLength)
+      jsonData, err = decode(Devices[x].Buffer)
+      if err == nil then
+        print(prefix .. " JSON OK, " .. #Devices[x].Buffer .. " bytes")
+        Devices[x].Buffer = ""
+        if DebugRx then
+          print(prefix .. " RX:\n" .. rapidjson.encode(jsonData))
+        end
+        if jsonData.system then
+          if jsonData.system.get_sysinfo then
+            if jsonData.system.get_sysinfo.err_code == 0 then
+              Controls[prefix .. "_Status"].Value = 0 --ok
+              Controls[prefix .. "_Status"].String = ""
             end
-          elseif jsonData["smartlife.iot.dimmer"] then
+            parseGetInfo(x, jsonData.system.get_sysinfo)
+          elseif jsonData.system.set_relay_state then
+            DevicePoll(x)
+          end
+        elseif jsonData["smartlife.iot.dimmer"] then -- Dimmer response
           -- Poll()
+        elseif jsonData.emeter then -- Energy info
+          if jsonData.emeter.get_realtime then -- Realtime energy info
+            parseEnergyInfo(x, jsonData.emeter.get_realtime)
           end
         else
-          print("JSON Err:", err)
-          print(decodeToString(data))
-          Controls["Device_" .. x .. "_Status"].Value = 2 --fault
-          Controls["Device_" .. x .. "_Status"].String = "JSON Error: ", err
+          print(prefix .. " Unknown JSON")
+          print(rapidjson.encode(jsonData))
         end
-      elseif event == TcpSocket.Events.Connected then
-        DevicePoll(x)
-        Timers[x]:Start(PollTime)
       else
-        Timers[x]:Stop()
-        Controls["Device_" .. x .. "_Status"].Value = 4 --missing
-        Controls["Device_" .. x .. "_Status"].String = event
+        -- Controls["Device_" .. x .. "_Status"].Value = 2 --fault
+        -- Controls["Device_" .. x .. "_Status"].String = "JSON Error: ", err
+        print("JSON Err:", err)
+        print(decodeToString(Devices[x].Buffer))
+        if err:find("The document root must not be followed by other values") then
+          Devices[x].Buffer = ""
+        end
+      end
+    elseif event == TcpSocket.Events.Connected then
+      DevicePoll(x)
+      Timers[x]:Start(PollTime)
+    else
+      Timers[x]:Stop()
+      Controls[prefix .. "_Status"].Value = 4 --missing
+      Controls[prefix .. "_Status"].String = event
+    end
+  end
+
+  Controls[prefix .. "_IP"].EventHandler = function(ctrl)
+    DeviceDisconnect(x)
+    DeviceConnect(x)
+  end
+  if isStrip then
+    for p = 1, 6 do
+      Controls[prefix .. "_Plug_" .. p .. "_On"].EventHandler = function(ctrl)
+        if
+          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
+            Devices[x].Info.children[p] ~= nil and
+            Devices[x].Info.children[p].id ~= nil
+         then
+          local childID =
+            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
+            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
+          if DebugTx then
+            print(
+              "Strip" ..
+                x ..
+                  " Plug " ..
+                    p ..
+                      " TX: " ..
+                        '{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":1}}}'
+            )
+          end
+          Sockets[x]:Write(
+            encode('{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":1}}}')
+          )
+        end
+      end
+      Controls[prefix .. "_Plug_" .. p .. "_Off"].EventHandler = function(ctrl)
+        if
+          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
+            Devices[x].Info.children[p] ~= nil and
+            Devices[x].Info.children[p].id ~= nil
+         then
+          local childID =
+            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
+            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
+          if DebugTx then
+            print(
+              "Strip" ..
+                x ..
+                  " Plug " ..
+                    p ..
+                      " TX: " ..
+                        '{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":0}}}'
+            )
+          end
+          Sockets[x]:Write(
+            encode('{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":0}}}')
+          )
+        end
+      end
+      Controls[prefix .. "_Plug_" .. p .. "_Toggle"].EventHandler = function(ctrl)
+        if
+          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
+            Devices[x].Info.children[p] ~= nil and
+            Devices[x].Info.children[p].id ~= nil
+         then
+          local childID =
+            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
+            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
+          if DebugTx then
+            print(
+              "Strip" ..
+                x ..
+                  " Plug " ..
+                    p ..
+                      " TX: " ..
+                        '{"context":{"child_ids":["' ..
+                          childID .. '"]},"system":{"set_relay_state":{"state":' .. (ctrl.Boolean and 1 or 0) .. "}}}"
+            )
+          end
+          Sockets[x]:Write(
+            encode(
+              '{"context":{"child_ids":["' ..
+                childID .. '"]},"system":{"set_relay_state":{"state":' .. (ctrl.Boolean and 1 or 0) .. "}}}"
+            )
+          )
+        end
+      end
+      Controls[prefix .. "_Plug_" .. p .. "_Name"].EventHandler = function(ctrl)
+        if
+          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
+            Devices[x].Info.children[p] ~= nil and
+            Devices[x].Info.children[p].id ~= nil
+         then
+          local childID =
+            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
+            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
+          if DebugTx then
+            print(
+              "Strip" ..
+                x ..
+                  " Plug " ..
+                    p ..
+                      " TX: " ..
+                        '{"context":{"child_ids":["' ..
+                          childID .. '"]},"system":{"set_dev_alias":{"alias":"' .. ctrl.String .. '"}}}'
+            )
+          end
+          Sockets[x]:Write(
+            encode(
+              '{"context":{"child_ids":["' ..
+                childID .. '"]},"system":{"set_dev_alias":{"alias":"' .. ctrl.String .. '"}}}'
+            )
+          )
+        end
       end
     end
-  
-    Controls["Device_" .. x .. "_IP"].EventHandler = function(ctrl)
-      DeviceDisconnect(x)
-      if ctrl.String ~= "" then
-        DeviceConnect(x)    
-      end
-    end
-  
-    Controls["Device_" .. x .. "_On"].EventHandler = function(ctrl)
+  else
+    Controls[prefix .. "_On"].EventHandler = function(ctrl)
       if Sockets[x].IsConnected then
         if DebugTx then
-          print("Device" .. x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":1 } } }')
+          print(prefix .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":1 } } }')
         end
         Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":1 } } }'))
       end
     end
-    Controls["Device_" .. x .. "_Off"].EventHandler = function(ctrl)
+    Controls[prefix .. "_Off"].EventHandler = function(ctrl)
       if Sockets[x].IsConnected then
         if DebugTx then
-          print("Device" .. x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":0 } } }')
+          print(prefix .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":0 } } }')
         end
         Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":0 } } }'))
       end
     end
-    Controls["Device_" .. x .. "_Toggle"].EventHandler = function(ctrl)
+    Controls[prefix .. "_Toggle"].EventHandler = function(ctrl)
       if Sockets[x].IsConnected then
         if DebugTx then
-          print("Device" .. x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":'..(ctrl.Boolean and 1 or 0)..' } } }')
+          print(
+            "Device" ..
+              x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":' .. (ctrl.Boolean and 1 or 0) .. " } } }"
+          )
         end
-        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":'..(ctrl.Boolean and 1 or 0)..' } } }'))
+        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":' .. (ctrl.Boolean and 1 or 0) .. " } } }"))
       end
     end
-    Controls["Device_" .. x .. "_Brightness"].EventHandler = function(ctrl)
+    Controls[prefix .. "_Brightness"].EventHandler = function(ctrl)
       FaderDebounce[x]:Stop()
       FaderDebounce[x]:Start(0.1)
     end
     FaderDebounce[x].EventHandler = function()
       FaderDebounce[x]:Stop()
       if Sockets[x].IsConnected then
-        val = math.floor(Controls["Device_" .. x .. "_Brightness"].Value)
+        val = math.floor(Controls[prefix .. "_Brightness"].Value)
         if DebugTx then
-          print("Device" .. x .. " TX: " .. '{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":'..val..' } } }')
+          print(prefix .. " TX: " .. '{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":' .. val .. " } } }")
         end
-        Sockets[x]:Write(encode('{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":'..val..' } } }'))
+        Sockets[x]:Write(encode('{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":' .. val .. " } } }"))
       end
     end
   end
-  
-  function ClearDeviceVariables(index)
-    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
-      Controls["Device_" .. index .. "_Status"].Value = 3
-      Controls["Device_" .. index .. "_Status"].String = ""
-      Controls["Device_" .. index .. "_On"].Boolean = false
-      Controls["Device_" .. index .. "_Off"].Boolean = false
-    end
-  end
-  function ClearVariables()
-    for d = 1, NumberOfDevices do
-      ClearDeviceVariables(d)
-    end
-  end
-  
-  function DeviceConnect(index)
-    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
-      local ip = Controls["Device_" .. index .. "_IP"].String
-      Timers[index]:Stop()
-      if ip ~= nil and ip ~= "" then
-        Sockets[index]:Connect(ip, 9999)
-      else
-        Controls["Device_" .. index .. "_Status"].Value = 3 --not present
-        Controls["Device_" .. index .. "_Status"].String = "No IP Address"
+  Controls[prefix .. "_Name"].EventHandler = function(ctrl)
+    if Sockets[x].IsConnected then
+      if DebugTx then
+        print(prefix .. " TX: " .. '{ "system":{ "set_dev_alias":{ "alias":"' .. ctrl.String .. '" } } }')
       end
+      Sockets[x]:Write(encode('{ "system":{ "set_dev_alias":{ "alias":"' .. ctrl.String .. '" } } }'))
     end
   end
-  function DeviceDisconnect(index)
-    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
-      Timers[index]:Stop()
-      Sockets[index]:Disconnect()
-      -- Controls["Device_" .. index .. "_Status"].Value = 3 --not present
-      -- Controls["Device_" .. index .. "_Status"].String = "Disconnected"
+end
+
+function ClearDeviceVariables(index)
+  if index ~= nil and type(index) == "number" then
+    local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
+    local isStrip = (index > NumberOfDevices)
+    if isStrip then
+      for p = 1, 6 do
+        Controls[prefix .. "_Plug_" .. p .. "_On"].Boolean = false
+        Controls[prefix .. "_Plug_" .. p .. "_Off"].Boolean = false
+        Controls[prefix .. "_Plug_" .. p .. "_Toggle"].Boolean = false
+        Controls[prefix .. "_Plug_" .. p .. "_Name"].String = ""
+        Controls[prefix .. "_Plug_" .. p .. "_Voltage"].String = ""
+        Controls[prefix .. "_Plug_" .. p .. "_Current"].String = ""
+        Controls[prefix .. "_Plug_" .. p .. "_Power"].String = ""
+      end
+    else
+      Controls[prefix .. "_On"].Boolean = false
+      Controls[prefix .. "_Off"].Boolean = false
+      Controls[prefix .. "_Toggle"].Boolean = false
+      Controls[prefix .. "_Brightness"].Value = 0
+      Controls[prefix .. "_Voltage"].String = ""
+      Controls[prefix .. "_Current"].String = ""
+      Controls[prefix .. "_Power"].String = ""
+    end
+    Controls[prefix .. "_Status"].Value = 3
+    Controls[prefix .. "_Status"].String = ""
+    Controls[prefix .. "_Name"].String = ""
+    Controls[prefix .. "_Model"].String = ""
+    Controls[prefix .. "_Mac"].String = ""
+    Controls[prefix .. "_Firmware"].String = ""
+    Controls[prefix .. "_Rssi"].String = ""
+  end
+end
+function ClearVariables()
+  for d = 1, NumberOfDevices + NumberOfStrips do
+    ClearDeviceVariables(d)
+  end
+end
+function HideControls(index)
+  if index ~= nil and type(index) == "number" then
+    local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
+    local isStrip = (index > NumberOfDevices)
+    if isStrip then
+      for p = 1, 6 do
+        Controls[prefix .. "_Plug_" .. p .. "_On"].IsInvisible = true
+        Controls[prefix .. "_Plug_" .. p .. "_Off"].IsInvisible = true
+        Controls[prefix .. "_Plug_" .. p .. "_Toggle"].IsInvisible = true
+        Controls[prefix .. "_Plug_" .. p .. "_Name"].IsInvisible = true
+        Controls[prefix .. "_Plug_" .. p .. "_Voltage"].IsInvisible = true
+        Controls[prefix .. "_Plug_" .. p .. "_Current"].IsInvisible = true
+        Controls[prefix .. "_Plug_" .. p .. "_Power"].IsInvisible = true
+      end
+    else
+      Controls[prefix .. "_Brightness"].IsInvisible = true
+      Controls[prefix .. "_On"].IsInvisible = true
+      Controls[prefix .. "_Off"].IsInvisible = true
+      Controls[prefix .. "_Toggle"].IsInvisible = true
     end
   end
-  function DevicePoll(index)
-    if index ~= nil and type(index) == "number" and index <= NumberOfDevices then
-      if Sockets[index].IsConnected then
-        if DebugTx then
-          print("Device" .. index .. " TX: " .. '{ "system":{ "get_sysinfo":null } }')
+end
+
+function DeviceConnect(index)
+  if index ~= nil and type(index) == "number" then
+    local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
+    local ip = Controls[prefix .. "_IP"].String
+    Timers[index]:Stop()
+    if ip ~= nil and ip ~= "" then
+      Sockets[index]:Connect(ip, 9999)
+    else
+      ClearDeviceVariables(index)
+      Controls[prefix .. "_Status"].Value = 3 --not present
+      Controls[prefix .. "_Status"].String = "No IP Address"
+      HideControls(index)
+    end
+  end
+end
+function DeviceDisconnect(index)
+  if index ~= nil and type(index) == "number" then
+    Timers[index]:Stop()
+    Sockets[index]:Disconnect()
+    HideControls(index)
+  -- Controls["Device_" .. index .. "_Status"].Value = 3 --not present
+  -- Controls["Device_" .. index .. "_Status"].String = "Disconnected"
+  end
+end
+function DevicePoll(index)
+  if index ~= nil and type(index) == "number" then
+    local isStrip = (index > NumberOfDevices)
+    if Sockets[index].IsConnected then
+      if DebugTx then
+        print("Device" .. index .. " TX: " .. '{ "system":{ "get_sysinfo":null } }')
+      end
+      Sockets[index]:Write(encode('{ "system":{ "get_sysinfo":null } }'))
+
+      if Devices[index].Info.feature ~= nil and Devices[index].Info.feature:find("ENE") then
+        if isStrip then
+          for p = 1, 6 do
+            if Devices[index].Info.children ~= nil and Devices[index].Info.children[p] ~= nil then
+              local childID =
+                #Devices[index].Info.children[p].id > 2 and Devices[index].Info.children[p].id or
+                Devices[index].Info.deviceId .. Devices[index].Info.children[p].id
+              if DebugTx then
+                print(
+                  "Strip" ..
+                    index ..
+                      " Plug " ..
+                        p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'
+                )
+              end
+              Sockets[index]:Write(
+                encode('{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}')
+              )
+            end
+          end
+        else
+          Timer.CallAfter(
+            function()
+              if DebugTx then
+                print("Device" .. index .. " TX: " .. '{"emeter":{"get_realtime":{}}}')
+              end
+              Sockets[index]:Write(encode('{"emeter":{"get_realtime":{}}}'))
+            end,
+            0.1
+          )
         end
-        Sockets[index]:Write(encode('{ "system":{ "get_sysinfo":null } }'))
       end
     end
   end
-  
-  function parseGetInfo(index, data)
-    local Meter = Controls["Device_" .. index .. "_Brightness"]
+end
+
+function parseGetInfo(index, data)
+  prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
+  isStrip = (index > NumberOfDevices)
+  -- print(prefix, rapidjson.encode(data))
+
+  -- Device Info
+  if data.alias then
+    Controls[prefix .. "_Name"].String = data.alias
+    Devices[index].Info.alias = data.alias
+  end
+  if data.model then
+    Controls[prefix .. "_Model"].String = data.model
+    Devices[index].Info.model = data.model
+  end
+  if data.mac then
+    Controls[prefix .. "_Mac"].String = data.mac
+    Devices[index].Info.mac = data.mac
+  end
+  if data.sw_ver then
+    Controls[prefix .. "_Firmware"].String = data.hw_ver
+    Devices[index].Info.sw_ver = data.sw_ver
+  end
+  if data.rssi then
+    Controls[prefix .. "_Rssi"].String = data.rssi
+    Devices[index].Info.rssi = data.rssi
+  end
+  if data.feature then
+    Devices[index].Info.feature = data.feature
+  end
+  if data.deviceId then
+    Devices[index].Info.deviceId = data.deviceId
+  end
+  if data.children then
+    Devices[index].Info.children = data.children
+    if not isStrip then
+      print("ERROR: Device " .. index .. " has children")
+    end
+  end
+  if isStrip then
+    if data.child_num > 0 and data.children then
+      for _, child in ipairs(data.children) do
+        childID = tonumber(child.id:sub(-2)) + 1
+        if child.alias then
+          Controls[prefix .. "_Plug_" .. childID .. "_Name"].String = child.alias
+        end
+        if child.state then
+          Controls[prefix .. "_Plug_" .. childID .. "_On"].Boolean = child.state == 1
+          Controls[prefix .. "_Plug_" .. childID .. "_Off"].Boolean = child.state == 0
+          Controls[prefix .. "_Plug_" .. childID .. "_Toggle"].Boolean = child.state == 1
+        end
+      end
+    end
+    local child_num = data.child_num or 0
+    for p = 1, 6 do
+      Controls[prefix .. "_Plug_" .. p .. "_On"].IsInvisible = (p > child_num)
+      Controls[prefix .. "_Plug_" .. p .. "_Off"].IsInvisible = (p > child_num)
+      Controls[prefix .. "_Plug_" .. p .. "_Toggle"].IsInvisible = (p > child_num)
+      Controls[prefix .. "_Plug_" .. p .. "_Name"].IsInvisible = (p > child_num)
+      Controls[prefix .. "_Plug_" .. p .. "_Voltage"].IsInvisible = (p > child_num) and data.feature:find("ENE")
+      Controls[prefix .. "_Plug_" .. p .. "_Current"].IsInvisible = (p > child_num) and data.feature:find("ENE")
+      Controls[prefix .. "_Plug_" .. p .. "_Power"].IsInvisible = (p > child_num) and data.feature:find("ENE")
+    end
+  else
+    local Meter = Controls[prefix .. "_Brightness"]
     if data.brightness then
       Meter.IsInvisible = false
       Meter.Value = data.brightness
     else
       Meter.IsInvisible = true
     end
-    local On = Controls["Device_" .. index .. "_On"]
-    local Off = Controls["Device_" .. index .. "_Off"]
-    local Toggle = Controls["Device_" .. index .. "_Toggle"]
+    local On = Controls[prefix .. "_On"]
+    local Off = Controls[prefix .. "_Off"]
+    local Toggle = Controls[prefix .. "_Toggle"]
     if data.relay_state then
       On.Boolean = data.relay_state == 1
       Off.Boolean = data.relay_state == 0
       Toggle.Boolean = data.relay_state == 1
-    end
-  
-    -- Device Info
-    if data.alias then
-      Controls["Device_" .. index .. "_Name"].String = data.alias
-    end
-    if data.model then
-      Controls["Device_" .. index .. "_Model"].String = data.model
-    end
-    if data.mac then
-      Controls["Device_" .. index .. "_Mac"].String = data.mac
-    end
-    if data.sw_ver then
-      Controls["Device_" .. index .. "_Firmware"].String = data.hw_ver
-    end
-    if data.rssi then
-      Controls["Device_" .. index .. "_Rssi"].String = data.rssi
+      On.IsInvisible = false
+      Off.IsInvisible = false
+      Toggle.IsInvisible = false
+    else
+      On.IsInvisible = true
+      Off.IsInvisible = true
+      Toggle.IsInvisible = true
     end
   end
-  
-  
-  function Init()
-    ClearVariables()
-    for d = 1, NumberOfDevices do
-      DeviceConnect(d)
+end
+function parseEnergyInfo(index, data)
+  -- print("parseEnergyInfo", index)
+  -- print(rapidjson.encode(data))
+  local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
+  local isStrip = (index > NumberOfDevices)
+  if isStrip then
+    local p = data.slot_id + 1
+    if data.voltage_mv then
+      Controls[prefix .. "_Plug_" .. p .. "_Voltage"].String = data.voltage_mv / 1000 .. " V"
+    end
+    if data.current_ma then
+      Controls[prefix .. "_Plug_" .. p .. "_Current"].String = data.current_ma / 1000 .. " A"
+    end
+    if data.power_mw then
+      Controls[prefix .. "_Plug_" .. p .. "_Power"].String = data.power_mw / 1000 .. " W"
+    end
+  else
+    if data.voltage_mv then
+      Controls[prefix .. "_Voltage"].String = data.voltage_mv / 1000 .. " V"
+    end
+    if data.current_ma then
+      Controls[prefix .. "_Current"].String = data.current_ma / 1000 .. " A"
+    end
+    if data.power_mw then
+      Controls[prefix .. "_Power"].String = data.power_mw / 1000 .. " W"
     end
   end
-  
-  Init()
+end
+
+function Init()
+  ClearVariables()
+  for d = 1, NumberOfDevices + NumberOfStrips do
+    HideControls(index)
+    DeviceConnect(d)
+  end
+end
+
+Init()
 end
