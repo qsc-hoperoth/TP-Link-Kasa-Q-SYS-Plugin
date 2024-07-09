@@ -1,5 +1,6 @@
 # ignore log files
 Log/
+*.json
 
 # ignore the built output
 *_archive.zip
