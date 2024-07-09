@@ -1,9 +1,9 @@
 PluginInfo = {
-  Name = "TP-Link Kasa Local TCP",
+  Name = "TP-Link Kasa",
   Author = "Eugene Dunn",
-  BuildVersion = "0.3.1.10",
-  Version = "0.1",
-  Id = "d71cb671-6e0a-4a35-9ca4-20a247089870",
+  BuildVersion = "0.5.0.1",
+  Version = "0.5.0.1",
+  Id = "ae99e75d-3c3f-4f13-97eb-7443f56cf23e",
   Description = ""
 }
 local Colors = {
@@ -32,19 +32,12 @@ function GetPrettyName(props)
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Central Control", "Discovery"} --List the pages within the plugin
-function PopulatePageNames(props)
-  for x = 1, props["Number Of Single Endpoints"].Value do
-    table.insert(PageNames, "Device " .. x)
-  end
-  for x = 1, props["Number Of Multi Endpoints"].Value do
-    table.insert(PageNames, "Strip " .. x)
-  end
-end
-
+PageNames = {"Setup","Loads","Discovery"} --List the pages within the plugin
 function GetPages(props)
   local pages = {}
-  PopulatePageNames(props)
+  if props["Energy Monitoring"].Value then
+    -- table.insert(PageNames, "Energy Graph",3)
+  end
   for ix,name in ipairs(PageNames) do
     table.insert(pages, {name = PageNames[ix]})
   end
@@ -54,30 +47,58 @@ end
 -- Define User configurable Properties of the plugin
 function GetProperties()
   local props = {}
+  -- table.insert(
+  --   props,
+  --   {
+  --     Name = "Number Of Single Endpoints",
+  --     Type = "integer",
+  --     Min = 0,
+  --     Max = MaxDevices,
+  --     Value = 1
+  --   }
+  -- )
+  -- table.insert(
+  --   props,
+  --   {
+  --     Name = "Number Of Multi Endpoints",
+  --     Type = "integer",
+  --     Min = 0,
+  --     Max = MaxDevices,
+  --     Value = 0
+  --   }
+  -- )
   table.insert(
     props,
     {
-      Name = "Number Of Single Endpoints",
-      Type = "integer",
-      Min = 0,
-      Max = MaxDevices,
-      Value = 1
+      Name = "Device Type",
+      Type = "enum",
+      Choices = {"Switch", "Dimmer", "Strip"},
+      Value = "Switch"
     }
   )
   table.insert(
     props,
     {
-      Name = "Number Of Multi Endpoints",
+      Name = "Energy Monitoring",
+      Type = "boolean",
+      Value = false
+    }
+  )
+  table.insert(
+    props,
+    {
+      Name = "Number Of Outputs",
       Type = "integer",
-      Min = 0,
-      Max = MaxDevices,
-      Value = 0
+      Min = 2,
+      Max = 6,
+      Value = 2
     }
   )
   table.insert(
     props,
     {
       Name = "Poll Time",
+      Comment = "Time in seconds between polling the devices",
       Type = "integer",
       Min = 1,
       Max = 60,
@@ -107,6 +128,8 @@ function RectifyProperties(props)
   if props.plugin_show_debug.Value == false then 
     props["Debug Print"].IsHidden = true 
   end
+  props["Energy Monitoring"].IsHidden = props["Device Type"].Value == "Dimmer" 
+  props["Number Of Outputs"].IsHidden = props["Device Type"].Value ~= "Strip"
   return props
 end
 
@@ -126,9 +149,7 @@ end
 function GetControls(props)
   local ctrls = {}
   -- table.insert(ctrls,{Name = "code",ControlType = "Text",PinStyle = "Input",Count = 1})
-  
-  local NumberOfDevices = props["Number Of Single Endpoints"].Value
-  local NumberOfStrips = props["Number Of Multi Endpoints"].Value
+  local outputCount = props["Device Type"].Value == "Strip" and props["Number Of Outputs"].Value or 1
   
   table.insert(
     ctrls,
@@ -152,60 +173,149 @@ function GetControls(props)
     }
   )
   
-  for d = 1, NumberOfDevices do
+  table.insert(
+    ctrls,
+    {
+      Name = "IPAddress",
+      ControlType = "Text",
+      PinStyle = "Both",
+      UserPin = true
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "Status",
+      ControlType = "Indicator",
+      IndicatorType = Reflect and "StatusGP" or "Status",
+      PinStyle = "Output",
+      UserPin = true
+    }
+  )
+  
+  table.insert(
+    ctrls,
+    {
+      Name = "Name",
+      ControlType = "Text",
+      PinStyle = "Both",
+      UserPin = true
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "Model",
+      ControlType = "Indicator",
+      IndicatorType = "Text",
+      PinStyle = "Output",
+      UserPin = true
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "MACAddress",
+      ControlType = "Indicator",
+      IndicatorType = "Text",
+      PinStyle = "Output",
+      UserPin = true
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "DeviceFirmware",
+      ControlType = "Indicator",
+      IndicatorType = "Text",
+      PinStyle = "Output",
+      UserPin = true
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "Rssi",
+      ControlType = "Indicator",
+      IndicatorType = "Text",
+      PinStyle = "Output",
+      UserPin = true
+    }
+  )
+  if props["Energy Monitoring"].Value then
     table.insert(
       ctrls,
       {
-        Name = "Device_" .. d .. "_IP",
-        ControlType = "Text",
-        PinStyle = "Both",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Status",
+        Name = "Voltage",
         ControlType = "Indicator",
-        IndicatorType = "Status",
+        IndicatorType = "Text",
         PinStyle = "Output",
-        UserPin = true
+        UserPin = true,
+        Count = outputCount
       }
     )
     table.insert(
       ctrls,
       {
-        Name = "Device_" .. d .. "_On",
-        ControlType = "Button",
-        ButtonType = "Toggle",
-        PinStyle = "Both",
-        UserPin = true
+        Name = "Current",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true,
+        Count = outputCount
       }
     )
     table.insert(
       ctrls,
       {
-        Name = "Device_" .. d .. "_Off",
-        ControlType = "Button",
-        ButtonType = "Toggle",
-        PinStyle = "Both",
-        UserPin = true
+        Name = "Power",
+        ControlType = "Indicator",
+        IndicatorType = "Text",
+        PinStyle = "Output",
+        UserPin = true,
+        Count = outputCount
       }
     )
+  end
+  
+  table.insert(
+    ctrls,
+    {
+      Name = "On",
+      ControlType = "Button",
+      ButtonType = "Toggle",
+      PinStyle = "Both",
+      UserPin = true,
+      Count = outputCount
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "Off",
+      ControlType = "Button",
+      ButtonType = "Toggle",
+      PinStyle = "Both",
+      UserPin = true,
+      Count = outputCount
+    }
+  )
+  table.insert(
+    ctrls,
+    {
+      Name = "Toggle",
+      ControlType = "Button",
+      ButtonType = "Toggle",
+      PinStyle = "Both",
+      UserPin = true,
+      Count = outputCount
+    }
+  )
+  if props["Device Type"].Value == "Dimmer" then
     table.insert(
       ctrls,
       {
-        Name = "Device_" .. d .. "_Toggle",
-        ControlType = "Button",
-        ButtonType = "Toggle",
-        PinStyle = "Both",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Brightness",
+        Name = "Brightness",
         ControlType = "Knob",
         ControlUnit = "Percent",
         Min = 1,
@@ -214,227 +324,18 @@ function GetControls(props)
         UserPin = true
       }
     )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Name",
-        ControlType = "Text",
-        PinStyle = "Both",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Model",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Mac",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Firmware",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Rssi",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Voltage",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Current",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Device_" .. d .. "_Power",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
   end
-  for d = 1, NumberOfStrips do
+  if props["Device Type"].Value == "Strip" then
     table.insert(
       ctrls,
       {
-        Name = "Strip_" .. d .. "_IP",
+        Name = "PlugName",
         ControlType = "Text",
         PinStyle = "Both",
-        UserPin = true
+        UserPin = true,
+        Count = outputCount
       }
     )
-    table.insert(
-      ctrls,
-      {
-        Name = "Strip_" .. d .. "_Status",
-        ControlType = "Indicator",
-        IndicatorType = "Status",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Strip_" .. d .. "_Name",
-        ControlType = "Text",
-        PinStyle = "Both",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Strip_" .. d .. "_Model",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Strip_" .. d .. "_Mac",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Strip_" .. d .. "_Firmware",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-    table.insert(
-      ctrls,
-      {
-        Name = "Strip_" .. d .. "_Rssi",
-        ControlType = "Indicator",
-        IndicatorType = "Text",
-        PinStyle = "Output",
-        UserPin = true
-      }
-    )
-  
-    for p = 1, 6 do -- Per Plug
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_On",
-          ControlType = "Button",
-          ButtonType = "Toggle",
-          PinStyle = "Both",
-          UserPin = true
-        }
-      )
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Off",
-          ControlType = "Button",
-          ButtonType = "Toggle",
-          PinStyle = "Both",
-          UserPin = true
-        }
-      )
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Toggle",
-          ControlType = "Button",
-          ButtonType = "Toggle",
-          PinStyle = "Both",
-          UserPin = true
-        }
-      )
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Name",
-          ControlType = "Text",
-          PinStyle = "Both",
-          UserPin = true
-        }
-      )
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Voltage",
-          ControlType = "Indicator",
-          IndicatorType = "Text",
-          PinStyle = "Output",
-          UserPin = true
-        }
-      )
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Current",
-          ControlType = "Indicator",
-          IndicatorType = "Text",
-          PinStyle = "Output",
-          UserPin = true
-        }
-      )
-      table.insert(
-        ctrls,
-        {
-          Name = "Strip_" .. d .. "_Plug_" .. p .. "_Power",
-          ControlType = "Indicator",
-          IndicatorType = "Text",
-          PinStyle = "Output",
-          UserPin = true
-        }
-      )
-    end
   end
   return ctrls
 end
@@ -448,10 +349,9 @@ function GetControlLayout(props)
   local x, y = 0, 10
   
   local current_page = props["page_index"].Value
-  local NumberOfDevices = props["Number Of Single Endpoints"].Value
-  local NumberOfStrips = props["Number Of Multi Endpoints"].Value
+  local deviceType = props["Device Type"].Value
   
-  if current_page == 2 then --Setup
+  if current_page == 3 then --Discover
     layout["Discover"] = {
       Position = {x, y},
       Size = {60, 40},
@@ -469,762 +369,308 @@ function GetControlLayout(props)
       VTextAlign = "Top",
       FontSize = 12
     }
-  elseif current_page == 1 then -- Central Control
+  elseif current_page == 1 then --Setup
     table.insert(
       graphics,
       {
         Type = "Label",
+        Text = "IP Address:",
         Position = {x, y},
-        Size = {40, 20},
-        Text = "Index",
+        Size = {100, 16},
+        HTextAlign = "Right",
         FontSize = 12
       }
     )
-    x = x + 40
+    x = x + 100
+    layout["IPAddress"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+    x = 0
+    y = y + 20
     table.insert(
       graphics,
       {
         Type = "Label",
+        Text = "Status:",
         Position = {x, y},
-        Size = {125, 20},
-        Text = "IP Address",
+        Size = {100, 16},
+        HTextAlign = "Right",
         FontSize = 12
       }
     )
-    x = x + 125
+    x = x + 100
+    layout["Status"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+    x = 0
+    y = y + 20
     table.insert(
       graphics,
       {
         Type = "Label",
+        Text = "Name:",
         Position = {x, y},
-        Size = {150, 20},
-        Text = "Status",
+        Size = {100, 16},
+        HTextAlign = "Right",
         FontSize = 12
       }
     )
-    x = x + 150
+    x = x + 100
+    layout["Name"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+    x = 0
+    y = y + 20
     table.insert(
       graphics,
       {
         Type = "Label",
+        Text = "Model:",
         Position = {x, y},
-        Size = {150, 20},
-        Text = "Name",
-        FontSize = 9
-      }
-    )
-    x = x + 150
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
-        Position = {x, y},
-        Size = {75, 20},
-        Text = "Toggle",
+        Size = {100, 16},
+        HTextAlign = "Right",
         FontSize = 12
       }
     )
-    x = x + 75
+    x = x + 100
+    layout["Model"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+    x = 0
+    y = y + 20
     table.insert(
       graphics,
       {
         Type = "Label",
+        Text = "MAC Address:",
         Position = {x, y},
-        Size = {75, 20},
-        Text = "Brightness",
+        Size = {100, 16},
+        HTextAlign = "Right",
         FontSize = 12
       }
     )
-    for d = 1, NumberOfDevices do
-      x = 0
-      y = y + 20
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
+    x = x + 100
+    layout["MACAddress"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+    x = 0
+    y = y + 20
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Text = "Device Firmware:",
+        Position = {x, y},
+        Size = {100, 16},
+        HTextAlign = "Right",
+        FontSize = 12
+      }
+    )
+    x = x + 100
+    layout["DeviceFirmware"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+    x = 0
+    y = y + 20
+    table.insert(
+      graphics,
+      {
+        Type = "Label",
+        Text = "RSSI:",
+        Position = {x, y},
+        Size = {100, 16},
+        HTextAlign = "Right",
+        FontSize = 12
+      }
+    )
+    x = x + 100
+    layout["Rssi"] = {
+      Position = {x, y},
+      Size = {200, 16},
+      Style = "Text",
+    }
+  elseif current_page == 2 then -- Loads
+    if props["Device Type"].Value == "Strip" then
+      for p = 1, props["Number Of Outputs"].Value do
+        x = 0
+        table.insert(
+          graphics,
+          {
+            Type = "Label",
+            Text = p..":",
+            Position = {x, y},
+            Size = {24,16},
+            FontSize = 12,
+            HTextAlign = "Right"
+          }
+        )
+        x = x + 24
+        layout["PlugName "..p] = {
           Position = {x, y},
-          Size = {40, 20},
-          Text = tostring(d),
-          FontSize = 12
+          Size = {50, 16},
+          Style = "Text",
         }
-      )
-      x = x + 40
-      layout["Device_" .. d .. "_IP"] = {
-        PrettyName = "Device" .. d .. "~IP Address",
-        Position = {x, y},
-        Size = {125, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      x = x + 125
-      layout["Device_" .. d .. "_Status"] = {
-        PrettyName = "Device" .. d .. "~Status",
-        Position = {x, y},
-        Size = {150, 20},
-        Style = "Text",
-        FontSize = 9
-      }
-      x = x + 150
-      layout["Device_" .. d .. "_Name"] = {
-        PrettyName = "Device" .. d .. "~Name",
-        Position = {x, y},
-        Size = {150, 20},
-        Style = "Text",
-        FontSize = 9
-      }
-      x = x + 150
-      layout["Device_" .. d .. "_Toggle"] = {
-        PrettyName = "Device" .. d .. "~Toggle",
-        Position = {x, y},
-        Size = {75, 20},
-        Style = "Button",
-        Legend = "Toggle",
-        FontSize = 12,
-        Margin = 0
-      }
-      x = x + 75
-      layout["Device_" .. d .. "_Brightness"] = {
-        PrettyName = "Device" .. d .. "~Brightness",
-        Position = {x, y},
-        Size = {75, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-    end
-    if NumberOfStrips > 0 then
-      x = 0
-      y = y + 20
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
+        x = x + 50
+        layout["Off "..p] = {
           Position = {x, y},
-          Size = {40, 20},
-          Text = "Strip",
-          FontSize = 12
-        }
-      )
-      x = x + 40
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {125, 20},
-          Text = "IP Address",
-          FontSize = 12
-        }
-      )
-      x = x + 125
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {150, 20},
-          Text = "Status",
-          FontSize = 12
-        }
-      )
-      x = x + 150
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {150, 20},
-          Text = "Name",
+          Size = {36,16},
+          Style = "Button",
+          ButtonStyle = "Toggle",
+          Legend = "Off",
           FontSize = 9
         }
-      )
-      x = x + 150
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
+        x = x + 36
+        layout["On "..p] = {
           Position = {x, y},
-          Size = {75, 20},
-          Text = "Plug 1",
-          FontSize = 12
+          Size = {36,16},
+          Style = "Button",
+          ButtonStyle = "Toggle",
+          Legend = "On",
+          FontSize = 9
         }
-      )
-      x = x + 75
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
+        x = x + 36
+        layout["Toggle "..p] = {
           Position = {x, y},
-          Size = {75, 20},
-          Text = "Plug 2",
-          FontSize = 12
+          Size = {36,16},
+          Style = "Button",
+          ButtonStyle = "Toggle",
+          Legend = "Toggle",
+          FontSize = 9
         }
-      )
-      x = x + 75
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
+        if props["Energy Monitoring"].Value then
+          x = x + 36
+          layout["Voltage "..p] = {
+            Position = {x, y},
+            Size = {50, 16},
+            Style = "Text",
+          }
+          x = x + 50
+          layout["Current "..p] = {
+            Position = {x, y},
+            Size = {50, 16},
+            Style = "Text",
+          }
+          x = x + 50
+          layout["Power "..p] = {
+            Position = {x, y},
+            Size = {50, 16},
+            Style = "Text",
+          }
+        end
+        y = y + 20
+      end
+    else
+      layout["Off"] = {
+        Position = {x, y},
+        Size = {60, 40},
+        Style = "Button",
+        ButtonStyle = "Toggle",
+        Legend = "Off",
+        FontSize = 14
+      }
+      x = x + 64
+      layout["On"] = {
+        Position = {x, y},
+        Size = {60, 40},
+        Style = "Button",
+        ButtonStyle = "Toggle",
+        Legend = "On",
+        FontSize = 14
+      }
+      x = x + 64
+      layout["Toggle"] = {
+        Position = {x, y},
+        Size = {60, 40},
+        Style = "Button",
+        ButtonStyle = "Toggle",
+        Legend = "Toggle",
+        FontSize = 14
+      }
+      x = 0
+      y = y + 64
+      if props["Device Type"].Value == "Dimmer" then
+        layout["Brightness"] = {
           Position = {x, y},
-          Size = {75, 20},
-          Text = "Plug 3",
-          FontSize = 12
+          Size = {188, 40},
+          Style = "Fader",
         }
-      )
-      x = x + 75
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
+        y = y + 44
+      end
+      if props["Energy Monitoring"].Value then
+        table.insert(
+          graphics,
+          {
+            Type = "Label",
+            Text = "Voltage:",
+            Position = {x, y},
+            Size = {50, 16},
+            HTextAlign = "Right",
+            FontSize = 12
+          }
+        )
+        x = x + 50
+        layout["Voltage"] = {
           Position = {x, y},
-          Size = {75, 20},
-          Text = "Plug 4",
-          FontSize = 12
+          Size = {50, 16},
+          Style = "Text",
         }
-      )
-      x = x + 75
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Plug 5",
-          FontSize = 12
-        }
-      )
-      x = x + 75
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Plug 6",
-          FontSize = 12
-        }
-      )
-      for d = 1, NumberOfStrips do
         x = 0
         y = y + 20
         table.insert(
           graphics,
           {
             Type = "Label",
+            Text = "Current:",
             Position = {x, y},
-            Size = {40, 20},
-            Text = tostring(d),
+            Size = {50, 16},
+            HTextAlign = "Right",
             FontSize = 12
           }
         )
-        x = x + 40
-        layout["Strip_" .. d .. "_IP"] = {
-          PrettyName = "Strip" .. d .. "~IP Address",
+        x = x + 50
+        layout["Current"] = {
           Position = {x, y},
-          Size = {125, 20},
+          Size = {50, 16},
           Style = "Text",
-          FontSize = 12
         }
-        x = x + 125
-        layout["Strip_" .. d .. "_Status"] = {
-          PrettyName = "Strip" .. d .. "~Status",
-          Position = {x, y},
-          Size = {150, 20},
-          Style = "Text",
-          FontSize = 9
-        }
-        x = x + 150
-        layout["Strip_" .. d .. "_Name"] = {
-          PrettyName = "Strip" .. d .. "~Name",
-          Position = {x, y},
-          Size = {150, 20},
-          Style = "Text",
-          FontSize = 9
-        }
-        x = x + 150
-        for p = 1, 6 do
-          layout["Strip_" .. d .. "_Plug_" .. p .. "_Toggle"] = {
-            PrettyName = "Strip" .. d .. "~Plug " .. p .. "~Toggle",
-            Position = {x, y},
-            Size = {75, 20},
-            Style = "Button",
-            Legend = "Toggle",
-            FontSize = 12,
-            Margin = 0
-          }
-          x = x + 75
-        end
-      end
-    end
-  else
-    local index = current_page - 2
-    prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
-    prettyNamePrefix = (index <= NumberOfDevices) and "Device" .. index or "Strip" .. (index - NumberOfDevices)
-    isStrip = (index > NumberOfDevices)
-    table.insert(
-      graphics,
-      {
-        Type = "GroupBox",
-        Position = {x, y},
-        Size = {300, 70},
-        Text = "Connection",
-        FontSize = 12,
-        StrokeColor = Colors.Black,
-        StrokeWidth = 1,
-        CornerRadius = 5
-      }
-    )
-    x = 10
-    y = 30
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
-        Position = {x, y},
-        Size = {125, 20},
-        Text = "IP Address",
-        FontSize = 12
-      }
-    )
-    layout[prefix .. "_IP"] = {
-      PrettyName = prettyNamePrefix .. "~IP Address",
-      Position = {x, y + 20},
-      Size = {125, 20},
-      Style = "Text",
-      FontSize = 12
-    }
-    x = x + 135
-    table.insert(
-      graphics,
-      {
-        Type = "Label",
-        Position = {x, y},
-        Size = {150, 20},
-        Text = "Status",
-        FontSize = 12
-      }
-    )
-    layout[prefix .. "_Status"] = {
-      PrettyName = prettyNamePrefix .. "~Status",
-      Position = {x, y + 20},
-      Size = {150, 20},
-      Style = "Text",
-      FontSize = 12
-    }
-    x = 0
-    y = 90
-    if isStrip then
-      table.insert(
-        graphics,
-        {
-          Type = "GroupBox",
-          Position = {x, y},
-          Size = {190, 150},
-          Text = "Device Info",
-          FontSize = 12,
-          StrokeColor = Colors.Black,
-          StrokeWidth = 1,
-          CornerRadius = 5
-        }
-      )
-  
-      --Device Info
-      x = x + 5
-      y = y + 20
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Name",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Name"] = {
-        PrettyName = prettyNamePrefix .. "~Name",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Model",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Model"] = {
-        PrettyName = prettyNamePrefix .. "~Model",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Mac Address",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Mac"] = {
-        PrettyName = prettyNamePrefix .. "~Mac Address",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 9
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Firmware",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Firmware"] = {
-        PrettyName = prettyNamePrefix .. "~Firmware",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "RSSI",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Rssi"] = {
-        PrettyName = prettyNamePrefix .. "~RSSI",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-  
-      -- Plugs
-      x = x + 200
-      for p = 1, 6 do
-        y = 90
+        x = 0
+        y = y + 20
         table.insert(
           graphics,
           {
-            Type = "GroupBox",
+            Type = "Label",
+            Text = "Power:",
             Position = {x, y},
-            Size = {90, 215},
-            Text = "Plug " .. p,
-            FontSize = 12,
-            StrokeColor = Colors.Black,
-            StrokeWidth = 1,
-            CornerRadius = 5
+            Size = {50, 16},
+            HTextAlign = "Right",
+            FontSize = 12
           }
         )
-        y = y + 20
-        layout[prefix .. "_Plug_" .. p .. "_Name"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Name",
-          Position = {x + 5, y},
-          Size = {80, 20},
-          Style = "Text",
-          FontSize = 9
-        }
-        y = y + 25
-        layout[prefix .. "_Plug_" .. p .. "_On"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~On",
-          Position = {x + 5, y},
-          Size = {40, 40},
-          Style = "Button",
-          Legend = "On",
-          FontSize = 12
-        }
-        -- y = y + 50
-        layout[prefix .. "_Plug_" .. p .. "_Off"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Off",
-          Position = {x + 45, y},
-          Size = {40, 40},
-          Style = "Button",
-          Legend = "Off",
-          FontSize = 12
-        }
-        y = y + 45
-        layout[prefix .. "_Plug_" .. p .. "_Toggle"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Toggle",
-          Position = {x + 5, y},
-          Size = {80, 40},
-          Style = "Button",
-          Legend = "Toggle",
-          FontSize = 12
-        }
-        y = y + 50
-        layout[prefix .. "_Plug_" .. p .. "_Voltage"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Voltage",
-          Position = {x + 5, y},
-          Size = {80, 20},
-          Style = "Text",
-          FontSize = 12
-        }
-        y = y + 25
-        layout[prefix .. "_Plug_" .. p .. "_Current"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Current",
-          Position = {x + 5, y},
-          Size = {80, 20},
-          Style = "Text",
-          FontSize = 12
-        }
-        y = y + 25
-        layout[prefix .. "_Plug_" .. p .. "_Power"] = {
-          PrettyName = prettyNamePrefix .. "~Plug " .. p .. "~Power",
-          Position = {x + 5, y},
-          Size = {80, 20},
-          Style = "Text",
-          FontSize = 12
-        }
-        x = x + 100
-      end
-    else
-      table.insert(
-        graphics,
-        {
-          Type = "GroupBox",
+        x = x + 50
+        layout["Power"] = {
           Position = {x, y},
-          Size = {100, 225},
-          Text = "Control",
-          FontSize = 12,
-          StrokeColor = Colors.Black,
-          StrokeWidth = 1,
-          CornerRadius = 5
+          Size = {50, 16},
+          Style = "Text",
         }
-      )
-      table.insert(
-        graphics,
-        {
-          Type = "GroupBox",
-          Position = {x + 110, y},
-          Size = {190, 225},
-          Text = "Device Info",
-          FontSize = 12,
-          StrokeColor = Colors.Black,
-          StrokeWidth = 1,
-          CornerRadius = 5
-        }
-      )
-      --Control
-      x = 5
-      y = y + 20
-      TopY = y
-      layout[prefix .. "_On"] = {
-        PrettyName = prettyNamePrefix .. "~On",
-        Position = {x, y},
-        Size = {40, 40},
-        Style = "Button",
-        Legend = "On",
-        FontSize = 12
-      }
-      x = x + 50
-      layout[prefix .. "_Off"] = {
-        PrettyName = prettyNamePrefix .. "~Off",
-        Position = {x, y},
-        Size = {40, 40},
-        Style = "Button",
-        Legend = "Off",
-        FontSize = 12
-      }
-      x = 5
-      y = y + 50
-      layout[prefix .. "_Toggle"] = {
-        PrettyName = prettyNamePrefix .. "~Toggle",
-        Position = {x, y},
-        Size = {90, 40},
-        Style = "Button",
-        Legend = "Toggle",
-        FontSize = 12
-      }
-      y = y + 50
-      layout[prefix .. "_Brightness"] = {
-        PrettyName = prettyNamePrefix .. "~Brightness",
-        Position = {x, y},
-        Size = {90, 80},
-        Style = "Knob",
-        FontSize = 12
-      }
   
-      --Device Info
-      x = x + 110
-      y = TopY
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Name",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Name"] = {
-        PrettyName = prettyNamePrefix .. "~Name",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Model",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Model"] = {
-        PrettyName = prettyNamePrefix .. "~Model",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Mac Address",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Mac"] = {
-        PrettyName = prettyNamePrefix .. "~Mac Address",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 9
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Firmware",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Firmware"] = {
-        PrettyName = prettyNamePrefix .. "~Firmware",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "RSSI",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Rssi"] = {
-        PrettyName = prettyNamePrefix .. "~RSSI",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Voltage",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Voltage"] = {
-        PrettyName = prettyNamePrefix .. "~Voltage",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Current",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Current"] = {
-        PrettyName = prettyNamePrefix .. "~Current",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
-      y = y + 25
-      table.insert(
-        graphics,
-        {
-          Type = "Label",
-          Position = {x, y},
-          Size = {75, 20},
-          Text = "Power",
-          FontSize = 12,
-          HTextAlign = "Right"
-        }
-      )
-      layout[prefix .. "_Power"] = {
-        PrettyName = prettyNamePrefix .. "~Power",
-        Position = {x + 80, y},
-        Size = {100, 20},
-        Style = "Text",
-        FontSize = 12
-      }
+      end
     end
+  
+    
+    
+  
   end
   return layout, graphics
 end
@@ -1233,8 +679,9 @@ end
 if Controls then
 rapidjson = require("rapidjson")
 
-NumberOfDevices = Properties["Number Of Single Endpoints"].Value
-NumberOfStrips = Properties["Number Of Multi Endpoints"].Value
+DeviceType = Properties["Device Type"].Value
+isStrip = DeviceType == "Strip"
+EnergyMonitoring = DeviceType ~= "Dimmer" and Properties["Energy Monitoring"].Value or false
 
 DebugTx, DebugRx, DebugFunction = false, false, false
 DebugPrint = Properties["Debug Print"].Value
@@ -1350,405 +797,328 @@ Controls.Discover.EventHandler = function()
   RenderDiscoveredDevices()
   DiscoverySocket:Send("255.255.255.255",9999,"\xd0\xf2\x81\xf8\x8b\xff\x9a\xf7\xd5\xef\x94\xb6\xd1\xb4\xc0\x9f\xec\x95\xe6\x8f\xe1\x87\xe8\xca\xf0\x8b\xf6\x8b\xf6")
 end 
-Sockets = {}
-Timers = {}
-FaderDebounce = {}
-local PollTime = Properties["Poll Time"].Value
+Socket = TcpSocket.New()
+PollTimer = Timer.New()
+FaderDebounce = Timer.New()
+PollTime = Properties["Poll Time"].Value
+Buffer = ""
+LastPacketErr = false
+Info = {}
+Energy = {}
 
-local Devices = {}
-
-for x = 1, NumberOfDevices + NumberOfStrips do
-  local prefix = (x <= NumberOfDevices) and "Device_" .. x or "Strip_" .. (x - NumberOfDevices)
-  local isStrip = (x > NumberOfDevices)
-  table.insert(Sockets, TcpSocket.New())
-  table.insert(Timers, Timer.New())
-  table.insert(FaderDebounce, Timer.New())
-  Devices[x] = {}
-  Devices[x].Buffer = ""
-  Devices[x].Info = {}
-  Devices[x].Energy = {}
-
-  Timers[x].EventHandler = function()
-    DevicePoll(x)
-  end
-  Sockets[x].EventHandler = function(socket, event, err)
-    -- print(event)
-    print(prefix .. " got " .. socket.BufferLength .. " bytes")
-    if event == TcpSocket.Events.Data then
-      Devices[x].Buffer = Devices[x].Buffer .. socket:Read(socket.BufferLength)
-      jsonData, err = decode(Devices[x].Buffer)
-      if err == nil then
-        print(prefix .. " JSON OK, " .. #Devices[x].Buffer .. " bytes")
-        Devices[x].Buffer = ""
-        if DebugRx then
-          print(prefix .. " RX:\n" .. rapidjson.encode(jsonData))
+PollTimer.EventHandler = function()
+  DevicePoll()
+end
+Socket.EventHandler = function(socket, event, err)
+  -- print(event)
+  print("got " .. socket.BufferLength .. " bytes")
+  if event == TcpSocket.Events.Data then
+    Buffer = Buffer .. socket:Read(socket.BufferLength)
+    jsonData, err = decode(Buffer)
+    if err == nil then
+      print("JSON OK, " .. #Buffer .. " bytes")
+      Buffer = ""
+      if DebugRx then
+        print("RX:\n" .. rapidjson.encode(jsonData))
+      end
+      if jsonData.system then
+        if jsonData.system.get_sysinfo then
+          if jsonData.system.get_sysinfo.err_code == 0 then
+            Controls["Status"].Value = 0 --ok
+            Controls["Status"].String = ""
+          end
+          parseGetInfo(jsonData.system.get_sysinfo)
+        elseif jsonData.system.set_relay_state then
+          DevicePoll()
         end
-        if jsonData.system then
-          if jsonData.system.get_sysinfo then
-            if jsonData.system.get_sysinfo.err_code == 0 then
-              Controls[prefix .. "_Status"].Value = 0 --ok
-              Controls[prefix .. "_Status"].String = ""
-            end
-            parseGetInfo(x, jsonData.system.get_sysinfo)
-          elseif jsonData.system.set_relay_state then
-            DevicePoll(x)
-          end
-        elseif jsonData["smartlife.iot.dimmer"] then -- Dimmer response
-          -- Poll()
-        elseif jsonData.emeter then -- Energy info
-          if jsonData.emeter.get_realtime then -- Realtime energy info
-            parseEnergyInfo(x, jsonData.emeter.get_realtime)
-          end
-        else
-          print(prefix .. " Unknown JSON")
-          print(rapidjson.encode(jsonData))
+      elseif jsonData["smartlife.iot.dimmer"] then -- Dimmer response
+        -- Poll()
+      elseif jsonData.emeter then -- Energy info
+        if jsonData.emeter.get_realtime and EnergyMonitoring then -- Realtime energy info
+          parseEnergyInfo(jsonData.emeter.get_realtime)
         end
       else
-        -- Controls["Device_" .. x .. "_Status"].Value = 2 --fault
-        -- Controls["Device_" .. x .. "_Status"].String = "JSON Error: ", err
-        print("JSON Err:", err)
-        print(decodeToString(Devices[x].Buffer))
-        if err:find("The document root must not be followed by other values") then
-          Devices[x].Buffer = ""
-        end
+        print("Unknown JSON")
+        print(rapidjson.encode(jsonData))
       end
-    elseif event == TcpSocket.Events.Connected then
-      DevicePoll(x)
-      Timers[x]:Start(PollTime)
+    elseif not LastPacketErr then
+      LastPacketErr = true
+      print("incomplete Packet")
     else
-      Timers[x]:Stop()
-      Controls[prefix .. "_Status"].Value = 4 --missing
-      Controls[prefix .. "_Status"].String = event
+      -- Controls["Device_" .. x .. "_Status"].Value = 2 --fault
+      -- Controls["Device_" .. x .. "_Status"].String = "JSON Error: ", err
+      -- print("JSON Err:", err)
+      -- print(decodeToString(Buffer))
+      -- if err:find("The document root must not be followed by other values") then
+        Buffer = ""
+        LastPacketErr = false
+      -- end
+    end
+  elseif event == TcpSocket.Events.Connected then
+    DevicePoll()
+    PollTimer:Start(PollTime)
+  else
+    PollTimer:Stop()
+    Controls["Status"].Value = 4 --missing
+    Controls["Status"].String = event
+  end
+end
+
+Controls["IPAddress"].EventHandler = function(ctrl)
+  DeviceDisconnect()
+  DeviceConnect()
+end
+if isStrip then
+  for p = 1, Properties["Number Of Outputs"].Value do
+    Controls["On"][p].EventHandler = function(ctrl)
+      if
+        Socket.IsConnected and Info.deviceId ~= nil and Info.children ~= nil and Info.children[p] ~= nil and
+          Info.children[p].id ~= nil
+       then
+        local childID = #Info.children[p].id > 2 and Info.children[p].id or Info.deviceId .. Info.children[p].id
+        if DebugTx then
+          print(
+            "Plug " ..
+              p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":1}}}'
+          )
+        end
+        Socket:Write(encode('{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":1}}}'))
+      end
+    end
+    Controls["Off"][p].EventHandler = function(ctrl)
+      if
+        Socket.IsConnected and Info.deviceId ~= nil and Info.children ~= nil and Info.children[p] ~= nil and
+          Info.children[p].id ~= nil
+       then
+        local childID = #Info.children[p].id > 2 and Info.children[p].id or Info.deviceId .. Info.children[p].id
+        if DebugTx then
+          print(
+            "Plug " ..
+              p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":0}}}'
+          )
+        end
+        Socket:Write(encode('{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":0}}}'))
+      end
+    end
+    Controls["Toggle"][p].EventHandler = function(ctrl)
+      if
+        Socket.IsConnected and Info.deviceId ~= nil and Info.children ~= nil and Info.children[p] ~= nil and
+          Info.children[p].id ~= nil
+       then
+        local childID = #Info.children[p].id > 2 and Info.children[p].id or Info.deviceId .. Info.children[p].id
+        if DebugTx then
+          print(
+            "Plug " ..
+              p ..
+                " TX: " ..
+                  '{"context":{"child_ids":["' ..
+                    childID .. '"]},"system":{"set_relay_state":{"state":' .. (ctrl.Boolean and 1 or 0) .. "}}}"
+          )
+        end
+        Socket:Write(
+          encode(
+            '{"context":{"child_ids":["' ..
+              childID .. '"]},"system":{"set_relay_state":{"state":' .. (ctrl.Boolean and 1 or 0) .. "}}}"
+          )
+        )
+      end
+    end
+    Controls["PlugName"][p].EventHandler = function(ctrl)
+      if
+        Socket.IsConnected and Info.deviceId ~= nil and Info.children ~= nil and Info.children[p] ~= nil and
+          Info.children[p].id ~= nil
+       then
+        local childID = #Info.children[p].id > 2 and Info.children[p].id or Info.deviceId .. Info.children[p].id
+        if DebugTx then
+          print(
+            "Plug " ..
+              p ..
+                " TX: " ..
+                  '{"context":{"child_ids":["' ..
+                    childID .. '"]},"system":{"set_dev_alias":{"alias":"' .. ctrl.String .. '"}}}'
+          )
+        end
+        Socket:Write(
+          encode(
+            '{"context":{"child_ids":["' ..
+              childID .. '"]},"system":{"set_dev_alias":{"alias":"' .. ctrl.String .. '"}}}'
+          )
+        )
+      end
     end
   end
-
-  Controls[prefix .. "_IP"].EventHandler = function(ctrl)
-    DeviceDisconnect(x)
-    DeviceConnect(x)
+else -- single load
+  Controls["On"].EventHandler = function(ctrl)
+    if Socket.IsConnected then
+      if DebugTx then
+        print("TX: " .. '{ "system":{ "set_relay_state":{ "state":1 } } }')
+      end
+      Socket:Write(encode('{ "system":{ "set_relay_state":{ "state":1 } } }'))
+    end
   end
+  Controls["Off"].EventHandler = function(ctrl)
+    if Socket.IsConnected then
+      if DebugTx then
+        print("TX: " .. '{ "system":{ "set_relay_state":{ "state":0 } } }')
+      end
+      Socket:Write(encode('{ "system":{ "set_relay_state":{ "state":0 } } }'))
+    end
+  end
+  Controls["Toggle"].EventHandler = function(ctrl)
+    if Socket.IsConnected then
+      if DebugTx then
+        print(
+          "Device" ..
+            x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":' .. (ctrl.Boolean and 1 or 0) .. " } } }"
+        )
+      end
+      Socket:Write(encode('{ "system":{ "set_relay_state":{ "state":' .. (ctrl.Boolean and 1 or 0) .. " } } }"))
+    end
+  end
+end
+if DeviceType == "Dimmer" then
+  Controls["Brightness"].EventHandler = function(ctrl)
+    FaderDebounce:Stop()
+    FaderDebounce:Start(0.1)
+  end
+  FaderDebounce.EventHandler = function()
+    FaderDebounce:Stop()
+    if Socket.IsConnected then
+      val = math.floor(Controls["Brightness"].Value)
+      if DebugTx then
+        print("TX: " .. '{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":' .. val .. " } } }")
+      end
+      Socket:Write(encode('{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":' .. val .. " } } }"))
+    end
+  end
+end
+Controls["Name"].EventHandler = function(ctrl)
+  if Socket.IsConnected then
+    if DebugTx then
+      print("TX: " .. '{ "system":{ "set_dev_alias":{ "alias":"' .. ctrl.String .. '" } } }')
+    end
+    Socket:Write(encode('{ "system":{ "set_dev_alias":{ "alias":"' .. ctrl.String .. '" } } }'))
+  end
+end
+
+function ClearVariables()
   if isStrip then
-    for p = 1, 6 do
-      Controls[prefix .. "_Plug_" .. p .. "_On"].EventHandler = function(ctrl)
-        if
-          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
-            Devices[x].Info.children[p] ~= nil and
-            Devices[x].Info.children[p].id ~= nil
-         then
-          local childID =
-            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
-            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
-          if DebugTx then
-            print(
-              "Strip" ..
-                x ..
-                  " Plug " ..
-                    p ..
-                      " TX: " ..
-                        '{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":1}}}'
-            )
-          end
-          Sockets[x]:Write(
-            encode('{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":1}}}')
-          )
-        end
-      end
-      Controls[prefix .. "_Plug_" .. p .. "_Off"].EventHandler = function(ctrl)
-        if
-          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
-            Devices[x].Info.children[p] ~= nil and
-            Devices[x].Info.children[p].id ~= nil
-         then
-          local childID =
-            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
-            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
-          if DebugTx then
-            print(
-              "Strip" ..
-                x ..
-                  " Plug " ..
-                    p ..
-                      " TX: " ..
-                        '{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":0}}}'
-            )
-          end
-          Sockets[x]:Write(
-            encode('{"context":{"child_ids":["' .. childID .. '"]},"system":{"set_relay_state":{"state":0}}}')
-          )
-        end
-      end
-      Controls[prefix .. "_Plug_" .. p .. "_Toggle"].EventHandler = function(ctrl)
-        if
-          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
-            Devices[x].Info.children[p] ~= nil and
-            Devices[x].Info.children[p].id ~= nil
-         then
-          local childID =
-            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
-            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
-          if DebugTx then
-            print(
-              "Strip" ..
-                x ..
-                  " Plug " ..
-                    p ..
-                      " TX: " ..
-                        '{"context":{"child_ids":["' ..
-                          childID .. '"]},"system":{"set_relay_state":{"state":' .. (ctrl.Boolean and 1 or 0) .. "}}}"
-            )
-          end
-          Sockets[x]:Write(
-            encode(
-              '{"context":{"child_ids":["' ..
-                childID .. '"]},"system":{"set_relay_state":{"state":' .. (ctrl.Boolean and 1 or 0) .. "}}}"
-            )
-          )
-        end
-      end
-      Controls[prefix .. "_Plug_" .. p .. "_Name"].EventHandler = function(ctrl)
-        if
-          Sockets[x].IsConnected and Devices[x].Info.deviceId ~= nil and Devices[x].Info.children ~= nil and
-            Devices[x].Info.children[p] ~= nil and
-            Devices[x].Info.children[p].id ~= nil
-         then
-          local childID =
-            #Devices[x].Info.children[p].id > 2 and Devices[x].Info.children[p].id or
-            Devices[x].Info.deviceId .. Devices[x].Info.children[p].id
-          if DebugTx then
-            print(
-              "Strip" ..
-                x ..
-                  " Plug " ..
-                    p ..
-                      " TX: " ..
-                        '{"context":{"child_ids":["' ..
-                          childID .. '"]},"system":{"set_dev_alias":{"alias":"' .. ctrl.String .. '"}}}'
-            )
-          end
-          Sockets[x]:Write(
-            encode(
-              '{"context":{"child_ids":["' ..
-                childID .. '"]},"system":{"set_dev_alias":{"alias":"' .. ctrl.String .. '"}}}'
-            )
-          )
-        end
+    for p = 1, Properties["Number Of Outputs"].Value do
+      Controls["On"][p].Boolean = false
+      Controls["Off"][p].Boolean = false
+      Controls["Toggle"][p].Boolean = false
+      Controls["PlugName"][p].String = ""
+      if EnergyMonitoring then
+        Controls["Voltage"][p].String = ""
+        Controls["Current"][p].String = ""
+        Controls["Power"][p].String = ""
       end
     end
   else
-    Controls[prefix .. "_On"].EventHandler = function(ctrl)
-      if Sockets[x].IsConnected then
-        if DebugTx then
-          print(prefix .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":1 } } }')
-        end
-        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":1 } } }'))
-      end
+    Controls["On"].Boolean = false
+    Controls["Off"].Boolean = false
+    Controls["Toggle"].Boolean = false
+    if DeviceType == "Dimmer" then
+      Controls["Brightness"].Value = 0
     end
-    Controls[prefix .. "_Off"].EventHandler = function(ctrl)
-      if Sockets[x].IsConnected then
-        if DebugTx then
-          print(prefix .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":0 } } }')
-        end
-        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":0 } } }'))
-      end
-    end
-    Controls[prefix .. "_Toggle"].EventHandler = function(ctrl)
-      if Sockets[x].IsConnected then
-        if DebugTx then
-          print(
-            "Device" ..
-              x .. " TX: " .. '{ "system":{ "set_relay_state":{ "state":' .. (ctrl.Boolean and 1 or 0) .. " } } }"
-          )
-        end
-        Sockets[x]:Write(encode('{ "system":{ "set_relay_state":{ "state":' .. (ctrl.Boolean and 1 or 0) .. " } } }"))
-      end
-    end
-    Controls[prefix .. "_Brightness"].EventHandler = function(ctrl)
-      FaderDebounce[x]:Stop()
-      FaderDebounce[x]:Start(0.1)
-    end
-    FaderDebounce[x].EventHandler = function()
-      FaderDebounce[x]:Stop()
-      if Sockets[x].IsConnected then
-        val = math.floor(Controls[prefix .. "_Brightness"].Value)
-        if DebugTx then
-          print(prefix .. " TX: " .. '{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":' .. val .. " } } }")
-        end
-        Sockets[x]:Write(encode('{ "smartlife.iot.dimmer":{ "set_brightness":{ "brightness":' .. val .. " } } }"))
-      end
+    if EnergyMonitoring then
+      Controls["Voltage"].String = ""
+      Controls["Current"].String = ""
+      Controls["Power"].String = ""
     end
   end
-  Controls[prefix .. "_Name"].EventHandler = function(ctrl)
-    if Sockets[x].IsConnected then
-      if DebugTx then
-        print(prefix .. " TX: " .. '{ "system":{ "set_dev_alias":{ "alias":"' .. ctrl.String .. '" } } }')
-      end
-      Sockets[x]:Write(encode('{ "system":{ "set_dev_alias":{ "alias":"' .. ctrl.String .. '" } } }'))
-    end
-  end
+  Controls["Status"].Value = 3
+  Controls["Status"].String = ""
+  Controls["Name"].String = ""
+  Controls["Model"].String = ""
+  Controls["MACAddress"].String = ""
+  Controls["DeviceFirmware"].String = ""
+  Controls["Rssi"].String = ""
 end
 
-function ClearDeviceVariables(index)
-  if index ~= nil and type(index) == "number" then
-    local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
-    local isStrip = (index > NumberOfDevices)
-    if isStrip then
-      for p = 1, 6 do
-        Controls[prefix .. "_Plug_" .. p .. "_On"].Boolean = false
-        Controls[prefix .. "_Plug_" .. p .. "_Off"].Boolean = false
-        Controls[prefix .. "_Plug_" .. p .. "_Toggle"].Boolean = false
-        Controls[prefix .. "_Plug_" .. p .. "_Name"].String = ""
-        Controls[prefix .. "_Plug_" .. p .. "_Voltage"].String = ""
-        Controls[prefix .. "_Plug_" .. p .. "_Current"].String = ""
-        Controls[prefix .. "_Plug_" .. p .. "_Power"].String = ""
-      end
-    else
-      Controls[prefix .. "_On"].Boolean = false
-      Controls[prefix .. "_Off"].Boolean = false
-      Controls[prefix .. "_Toggle"].Boolean = false
-      Controls[prefix .. "_Brightness"].Value = 0
-      Controls[prefix .. "_Voltage"].String = ""
-      Controls[prefix .. "_Current"].String = ""
-      Controls[prefix .. "_Power"].String = ""
-    end
-    Controls[prefix .. "_Status"].Value = 3
-    Controls[prefix .. "_Status"].String = ""
-    Controls[prefix .. "_Name"].String = ""
-    Controls[prefix .. "_Model"].String = ""
-    Controls[prefix .. "_Mac"].String = ""
-    Controls[prefix .. "_Firmware"].String = ""
-    Controls[prefix .. "_Rssi"].String = ""
-  end
-end
-function ClearVariables()
-  for d = 1, NumberOfDevices + NumberOfStrips do
-    ClearDeviceVariables(d)
-  end
-end
-function HideControls(index)
-  if index ~= nil and type(index) == "number" then
-    local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
-    local isStrip = (index > NumberOfDevices)
-    if isStrip then
-      for p = 1, 6 do
-        Controls[prefix .. "_Plug_" .. p .. "_On"].IsInvisible = true
-        Controls[prefix .. "_Plug_" .. p .. "_Off"].IsInvisible = true
-        Controls[prefix .. "_Plug_" .. p .. "_Toggle"].IsInvisible = true
-        Controls[prefix .. "_Plug_" .. p .. "_Name"].IsInvisible = true
-        Controls[prefix .. "_Plug_" .. p .. "_Voltage"].IsInvisible = true
-        Controls[prefix .. "_Plug_" .. p .. "_Current"].IsInvisible = true
-        Controls[prefix .. "_Plug_" .. p .. "_Power"].IsInvisible = true
-      end
-    else
-      Controls[prefix .. "_Brightness"].IsInvisible = true
-      Controls[prefix .. "_On"].IsInvisible = true
-      Controls[prefix .. "_Off"].IsInvisible = true
-      Controls[prefix .. "_Toggle"].IsInvisible = true
-    end
-  end
-end
-
-function DeviceConnect(index)
-  if index ~= nil and type(index) == "number" then
-    local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
-    local ip = Controls[prefix .. "_IP"].String
-    Timers[index]:Stop()
-    if ip ~= nil and ip ~= "" then
-      Sockets[index]:Connect(ip, 9999)
-    else
-      ClearDeviceVariables(index)
-      Controls[prefix .. "_Status"].Value = 3 --not present
-      Controls[prefix .. "_Status"].String = "No IP Address"
-      HideControls(index)
-    end
+function DeviceConnect()
+  local ip = Controls["IPAddress"].String
+  PollTimer:Stop()
+  if ip ~= nil and ip ~= "" then
+    Socket:Connect(ip, 9999)
+  else
+    ClearVariables()
+    Controls["Status"].Value = 3 --not present
+    Controls["Status"].String = "No IP Address"
   end
 end
 function DeviceDisconnect(index)
-  if index ~= nil and type(index) == "number" then
-    Timers[index]:Stop()
-    Sockets[index]:Disconnect()
-    HideControls(index)
-  -- Controls["Device_" .. index .. "_Status"].Value = 3 --not present
-  -- Controls["Device_" .. index .. "_Status"].String = "Disconnected"
-  end
+  PollTimer:Stop()
+  Socket:Disconnect()
+  -- Controls["Status"].Value = 3 --not present
+  -- Controls["Status"].String = "Disconnected"
 end
-function DevicePoll(index)
-  if index ~= nil and type(index) == "number" then
-    local isStrip = (index > NumberOfDevices)
-    if Sockets[index].IsConnected then
-      if DebugTx then
-        print("Device" .. index .. " TX: " .. '{ "system":{ "get_sysinfo":null } }')
-      end
-      Sockets[index]:Write(encode('{ "system":{ "get_sysinfo":null } }'))
+function DevicePoll()
+  if Socket.IsConnected then
+    if DebugTx then
+      print("TX: " .. '{ "system":{ "get_sysinfo":null } }')
+    end
+    Socket:Write(encode('{ "system":{ "get_sysinfo":null } }'))
 
-      if Devices[index].Info.feature ~= nil and Devices[index].Info.feature:find("ENE") then
-        if isStrip then
-          for p = 1, 6 do
-            if Devices[index].Info.children ~= nil and Devices[index].Info.children[p] ~= nil then
-              local childID =
-                #Devices[index].Info.children[p].id > 2 and Devices[index].Info.children[p].id or
-                Devices[index].Info.deviceId .. Devices[index].Info.children[p].id
-              if DebugTx then
-                print(
-                  "Strip" ..
-                    index ..
-                      " Plug " ..
-                        p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'
-                )
-              end
-              Sockets[index]:Write(
-                encode('{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}')
+    if EnergyMonitoring and Info.feature ~= nil and Info.feature:find("ENE") then
+      if isStrip then
+        for p = 1, Properties["Number Of Outputs"].Value do
+          if Info.children ~= nil and Info.children[p] ~= nil then
+            local childID = #Info.children[p].id > 2 and Info.children[p].id or Info.deviceId .. Info.children[p].id
+            if DebugTx then
+              print(
+                "Plug " ..
+                  p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'
               )
             end
+            Socket:Write(encode('{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'))
           end
-        else
-          Timer.CallAfter(
-            function()
-              if DebugTx then
-                print("Device" .. index .. " TX: " .. '{"emeter":{"get_realtime":{}}}')
-              end
-              Sockets[index]:Write(encode('{"emeter":{"get_realtime":{}}}'))
-            end,
-            0.1
-          )
         end
+      else
+        Timer.CallAfter(
+          function()
+            if DebugTx then
+              print("TX: " .. '{"emeter":{"get_realtime":{}}}')
+            end
+            Socket:Write(encode('{"emeter":{"get_realtime":{}}}'))
+          end,
+          0.1
+        )
       end
     end
   end
 end
 
-function parseGetInfo(index, data)
-  prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
-  isStrip = (index > NumberOfDevices)
-  -- print(prefix, rapidjson.encode(data))
-
+function parseGetInfo(data)
   -- Device Info
   if data.alias then
-    Controls[prefix .. "_Name"].String = data.alias
-    Devices[index].Info.alias = data.alias
+    Controls["Name"].String = data.alias
+    Info.alias = data.alias
   end
   if data.model then
-    Controls[prefix .. "_Model"].String = data.model
-    Devices[index].Info.model = data.model
+    Controls["Model"].String = data.model
+    Info.model = data.model
   end
   if data.mac then
-    Controls[prefix .. "_Mac"].String = data.mac
-    Devices[index].Info.mac = data.mac
+    Controls["MACAddress"].String = data.mac
+    Info.mac = data.mac
   end
   if data.sw_ver then
-    Controls[prefix .. "_Firmware"].String = data.hw_ver
-    Devices[index].Info.sw_ver = data.sw_ver
+    Controls["DeviceFirmware"].String = data.hw_ver
+    Info.sw_ver = data.sw_ver
   end
   if data.rssi then
-    Controls[prefix .. "_Rssi"].String = data.rssi
-    Devices[index].Info.rssi = data.rssi
+    Controls["Rssi"].String = data.rssi
+    Info.rssi = data.rssi
   end
   if data.feature then
-    Devices[index].Info.feature = data.feature
+    Info.feature = data.feature
   end
   if data.deviceId then
-    Devices[index].Info.deviceId = data.deviceId
+    Info.deviceId = data.deviceId
   end
   if data.children then
-    Devices[index].Info.children = data.children
+    Info.children = data.children
     if not isStrip then
       print("ERROR: Device " .. index .. " has children")
     end
@@ -1758,85 +1128,56 @@ function parseGetInfo(index, data)
       for _, child in ipairs(data.children) do
         childID = tonumber(child.id:sub(-2)) + 1
         if child.alias then
-          Controls[prefix .. "_Plug_" .. childID .. "_Name"].String = child.alias
+          Controls["PlugName"][childID].String = child.alias
         end
         if child.state then
-          Controls[prefix .. "_Plug_" .. childID .. "_On"].Boolean = child.state == 1
-          Controls[prefix .. "_Plug_" .. childID .. "_Off"].Boolean = child.state == 0
-          Controls[prefix .. "_Plug_" .. childID .. "_Toggle"].Boolean = child.state == 1
+          Controls["On"][childID].Boolean = child.state == 1
+          Controls["Off"][childID].Boolean = child.state == 0
+          Controls["Toggle"][childID].Boolean = child.state == 1
         end
       end
     end
-    local child_num = data.child_num or 0
-    for p = 1, 6 do
-      Controls[prefix .. "_Plug_" .. p .. "_On"].IsInvisible = (p > child_num)
-      Controls[prefix .. "_Plug_" .. p .. "_Off"].IsInvisible = (p > child_num)
-      Controls[prefix .. "_Plug_" .. p .. "_Toggle"].IsInvisible = (p > child_num)
-      Controls[prefix .. "_Plug_" .. p .. "_Name"].IsInvisible = (p > child_num)
-      Controls[prefix .. "_Plug_" .. p .. "_Voltage"].IsInvisible = (p > child_num) and data.feature:find("ENE")
-      Controls[prefix .. "_Plug_" .. p .. "_Current"].IsInvisible = (p > child_num) and data.feature:find("ENE")
-      Controls[prefix .. "_Plug_" .. p .. "_Power"].IsInvisible = (p > child_num) and data.feature:find("ENE")
-    end
   else
-    local Meter = Controls[prefix .. "_Brightness"]
-    if data.brightness then
-      Meter.IsInvisible = false
-      Meter.Value = data.brightness
-    else
-      Meter.IsInvisible = true
+    if DeviceType == "Dimmer" then
+      if data.brightness then
+        Controls["Brightness"].Value = data.brightness
+      end
     end
-    local On = Controls[prefix .. "_On"]
-    local Off = Controls[prefix .. "_Off"]
-    local Toggle = Controls[prefix .. "_Toggle"]
     if data.relay_state then
-      On.Boolean = data.relay_state == 1
-      Off.Boolean = data.relay_state == 0
-      Toggle.Boolean = data.relay_state == 1
-      On.IsInvisible = false
-      Off.IsInvisible = false
-      Toggle.IsInvisible = false
-    else
-      On.IsInvisible = true
-      Off.IsInvisible = true
-      Toggle.IsInvisible = true
+      Controls["On"].Boolean = data.relay_state == 1
+      Controls["Off"].Boolean = data.relay_state == 0
+      Controls["Toggle"].Boolean = data.relay_state == 1
     end
   end
 end
-function parseEnergyInfo(index, data)
-  -- print("parseEnergyInfo", index)
-  -- print(rapidjson.encode(data))
-  local prefix = (index <= NumberOfDevices) and "Device_" .. index or "Strip_" .. (index - NumberOfDevices)
-  local isStrip = (index > NumberOfDevices)
+function parseEnergyInfo(data)
   if isStrip then
     local p = data.slot_id + 1
     if data.voltage_mv then
-      Controls[prefix .. "_Plug_" .. p .. "_Voltage"].String = data.voltage_mv / 1000 .. " V"
+      Controls["Voltage"][p].String = data.voltage_mv / 1000 .. " V"
     end
     if data.current_ma then
-      Controls[prefix .. "_Plug_" .. p .. "_Current"].String = data.current_ma / 1000 .. " A"
+      Controls["Current"][p].String = data.current_ma / 1000 .. " A"
     end
     if data.power_mw then
-      Controls[prefix .. "_Plug_" .. p .. "_Power"].String = data.power_mw / 1000 .. " W"
+      Controls["Power"][p].String = data.power_mw / 1000 .. " W"
     end
   else
     if data.voltage_mv then
-      Controls[prefix .. "_Voltage"].String = data.voltage_mv / 1000 .. " V"
+      Controls["Voltage"].String = data.voltage_mv / 1000 .. " V"
     end
     if data.current_ma then
-      Controls[prefix .. "_Current"].String = data.current_ma / 1000 .. " A"
+      Controls["Current"].String = data.current_ma / 1000 .. " A"
     end
     if data.power_mw then
-      Controls[prefix .. "_Power"].String = data.power_mw / 1000 .. " W"
+      Controls["Power"].String = data.power_mw / 1000 .. " W"
     end
   end
 end
 
 function Init()
   ClearVariables()
-  for d = 1, NumberOfDevices + NumberOfStrips do
-    HideControls(index)
-    DeviceConnect(d)
-  end
+  DeviceConnect()
 end
 
 Init()

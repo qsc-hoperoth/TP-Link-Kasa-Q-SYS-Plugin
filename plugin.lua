@@ -25,16 +25,7 @@ function GetPrettyName(props)
 end
 
 -- Optional function used if plugin has multiple pages
-PageNames = {"Central Control", "Discovery"} --List the pages within the plugin
-function PopulatePageNames(props)
-  for x = 1, props["Number Of Single Endpoints"].Value do
-    table.insert(PageNames, "Device " .. x)
-  end
-  for x = 1, props["Number Of Multi Endpoints"].Value do
-    table.insert(PageNames, "Strip " .. x)
-  end
-end
-
+PageNames = {"Setup","Loads","Discovery"} --List the pages within the plugin
 function GetPages(props)
   local pages = {}
   --[[ #include "pages.lua" ]]

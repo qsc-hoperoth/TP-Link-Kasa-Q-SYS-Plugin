@@ -1,8 +1,8 @@
 PluginInfo = {
-  Name = "TP-Link Kasa Local TCP",
+  Name = "TP-Link Kasa",
   Author = "Eugene Dunn",
-  BuildVersion = "0.3.1.10",
-  Version = "0.1",
-  Id = "d71cb671-6e0a-4a35-9ca4-20a247089870",
+  BuildVersion = "0.5.0.1",
+  Version = "0.5.0.1",
+  Id = "ae99e75d-3c3f-4f13-97eb-7443f56cf23e",
   Description = ""
 }
