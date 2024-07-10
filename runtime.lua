@@ -36,13 +36,14 @@ PollTimer.EventHandler = function()
 end
 Socket.EventHandler = function(socket, event, err)
   -- print(event)
-  print("got " .. socket.BufferLength .. " bytes")
   if event == TcpSocket.Events.Data then
+    -- print("got " .. socket.BufferLength .. " bytes")
     Buffer = Buffer .. socket:Read(socket.BufferLength)
     jsonData, err = decode(Buffer)
     if err == nil then
       print("JSON OK, " .. #Buffer .. " bytes")
       Buffer = ""
+      LastPacketErr = false
       if DebugRx then
         print("RX:\n" .. rapidjson.encode(jsonData))
       end
@@ -70,14 +71,15 @@ Socket.EventHandler = function(socket, event, err)
       LastPacketErr = true
       print("incomplete Packet")
     else
+      -- end
       -- Controls["Device_" .. x .. "_Status"].Value = 2 --fault
       -- Controls["Device_" .. x .. "_Status"].String = "JSON Error: ", err
       -- print("JSON Err:", err)
-      -- print(decodeToString(Buffer))
+      print("strikeout")
+      print(decodeToString(Buffer))
       -- if err:find("The document root must not be followed by other values") then
-        Buffer = ""
-        LastPacketErr = false
-      -- end
+      Buffer = ""
+      LastPacketErr = false
     end
   elseif event == TcpSocket.Events.Connected then
     DevicePoll()
@@ -290,13 +292,18 @@ function DevicePoll()
         for p = 1, Properties["Number Of Outputs"].Value do
           if Info.children ~= nil and Info.children[p] ~= nil then
             local childID = #Info.children[p].id > 2 and Info.children[p].id or Info.deviceId .. Info.children[p].id
-            if DebugTx then
-              print(
-                "Plug " ..
-                  p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'
-              )
-            end
-            Socket:Write(encode('{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'))
+            Timer.CallAfter(
+              function()
+                if DebugTx then
+                  print(
+                    "Plug " ..
+                      p .. " TX: " .. '{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'
+                  )
+                end
+                Socket:Write(encode('{"context":{"child_ids":["' .. childID .. '"]},"emeter":{"get_realtime":{}}}'))
+              end,
+              (.1 * p)
+            )
           end
         end
       else
