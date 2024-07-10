@@ -84,6 +84,8 @@ Socket.EventHandler = function(socket, event, err)
   elseif event == TcpSocket.Events.Connected then
     DevicePoll()
     PollTimer:Start(PollTime)
+    Buffer = ""
+    LastPacketErr = false
   else
     PollTimer:Stop()
     Controls["Status"].Value = 4 --missing
@@ -266,6 +268,10 @@ end
 function DeviceConnect()
   local ip = Controls["IPAddress"].String
   PollTimer:Stop()
+  Buffer = ""
+  LastPacketErr = false
+  Info = {}
+  Energy = {}
   if ip ~= nil and ip ~= "" then
     Socket:Connect(ip, 9999)
   else

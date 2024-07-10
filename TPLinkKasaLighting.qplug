@@ -1,8 +1,8 @@
 PluginInfo = {
   Name = "TP-Link Kasa",
   Author = "Eugene Dunn",
-  BuildVersion = "0.5.1.0",
-  Version = "0.5.1.0",
+  BuildVersion = "0.5.2.0",
+  Version = "0.5.2.0",
   Id = "ae99e75d-3c3f-4f13-97eb-7443f56cf23e",
   Description = ""
 }
@@ -701,7 +701,7 @@ StatusState = {OK = 0, COMPROMISED = 1, FAULT = 2, NOTPRESENT = 3, MISSING = 4, 
 
 function decode(buf, udp)
   local ascii = ""
-  local hex = ""
+  -- local hex = ""
   -- Decryption key is -85 (256-85=171)
   local key = 171
   -- Decrypt Autokey XOR
@@ -712,7 +712,7 @@ function decode(buf, udp)
     d = c ~ key
     -- Use byte as next key
     key = c
-    hex = hex .. string.format("%x ", d)
+    -- hex = hex .. string.format("%x ", d)
     -- Convert to printable characters
     if d >= 0x20 and d <= 0x7E then
       ascii = ascii .. string.format("%c", d)
@@ -727,7 +727,7 @@ function decode(buf, udp)
 end 
 function decodeToString(buf, udp)
   local ascii = ""
-  local hex = ""
+  -- local hex = ""
   -- Decryption key is -85 (256-85=171)
   local key = 171
   -- Decrypt Autokey XOR
@@ -738,7 +738,7 @@ function decodeToString(buf, udp)
     d = c ~ key
     -- Use byte as next key
     key = c
-    hex = hex .. string.format("%x ", d)
+    -- hex = hex .. string.format("%x ", d)
     -- Convert to printable characters
     if d >= 0x20 and d <= 0x7E then
       ascii = ascii .. string.format("%c", d)
@@ -867,6 +867,8 @@ Socket.EventHandler = function(socket, event, err)
   elseif event == TcpSocket.Events.Connected then
     DevicePoll()
     PollTimer:Start(PollTime)
+    Buffer = ""
+    LastPacketErr = false
   else
     PollTimer:Stop()
     Controls["Status"].Value = 4 --missing
@@ -1049,6 +1051,10 @@ end
 function DeviceConnect()
   local ip = Controls["IPAddress"].String
   PollTimer:Stop()
+  Buffer = ""
+  LastPacketErr = false
+  Info = {}
+  Energy = {}
   if ip ~= nil and ip ~= "" then
     Socket:Connect(ip, 9999)
   else

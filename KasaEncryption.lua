@@ -1,6 +1,6 @@
 function decode(buf, udp)
   local ascii = ""
-  local hex = ""
+  -- local hex = ""
   -- Decryption key is -85 (256-85=171)
   local key = 171
   -- Decrypt Autokey XOR
@@ -11,7 +11,7 @@ function decode(buf, udp)
     d = c ~ key
     -- Use byte as next key
     key = c
-    hex = hex .. string.format("%x ", d)
+    -- hex = hex .. string.format("%x ", d)
     -- Convert to printable characters
     if d >= 0x20 and d <= 0x7E then
       ascii = ascii .. string.format("%c", d)
@@ -26,7 +26,7 @@ function decode(buf, udp)
 end 
 function decodeToString(buf, udp)
   local ascii = ""
-  local hex = ""
+  -- local hex = ""
   -- Decryption key is -85 (256-85=171)
   local key = 171
   -- Decrypt Autokey XOR
@@ -37,7 +37,7 @@ function decodeToString(buf, udp)
     d = c ~ key
     -- Use byte as next key
     key = c
-    hex = hex .. string.format("%x ", d)
+    -- hex = hex .. string.format("%x ", d)
     -- Convert to printable characters
     if d >= 0x20 and d <= 0x7E then
       ascii = ascii .. string.format("%c", d)
