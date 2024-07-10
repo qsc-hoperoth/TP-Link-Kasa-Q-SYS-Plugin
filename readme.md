@@ -1,9 +1,17 @@
-# QSYS Plugin Template
+# TP-Link Kasa Plugin 
 
-Warning: The Folder name will translate to the plugin file name and should have no spaces
+*Warning: I have only verified this plugin in my own enviroment and needs community testing.*
 
-Build Key Binding: Ctrl + Shift + B
+Tested on QDS 9.10.2 with a Core 110f
 
-[SDK Help](https://q-syshelp.qsc.com/DeveloperHelp/#Welcome.htm?TocPath=_____1)
+## Kasa Devices Tested
 
-[Plugin Compiler Help](https://q-syshelp.qsc.com/DeveloperHelp/#Development_Tools/Plugin_Compiler.htm)
+- KS200M
+- EP10
+- EP40
+- HS220
+- HS103
+- HS200
+- HS300
+- KP115
+- KS230
