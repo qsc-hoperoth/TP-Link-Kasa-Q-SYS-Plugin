@@ -39,9 +39,16 @@ Socket.EventHandler = function(socket, event, err)
   if event == TcpSocket.Events.Data then
     -- print("got " .. socket.BufferLength .. " bytes")
     Buffer = Buffer .. socket:Read(socket.BufferLength)
-    jsonData, err = decode(Buffer)
-    if err == nil then
-      print("JSON OK, " .. #Buffer .. " bytes")
+    local jsonData, err = nil, nil
+    local success, pcallError = pcall(function() jsonData, err = decode(Buffer) end)
+    if not success then
+      print("Error: " .. pcallError)
+      print("Buffer Length: " .. #Buffer)
+      Buffer = ""
+      LastPacketErr = false
+    
+    elseif err == nil then
+      -- print("JSON OK, " .. #Buffer .. " bytes")
       Buffer = ""
       LastPacketErr = false
       if DebugRx then
@@ -69,7 +76,7 @@ Socket.EventHandler = function(socket, event, err)
       end
     elseif not LastPacketErr then
       LastPacketErr = true
-      print("incomplete Packet")
+      -- print("incomplete Packet")
     else
       -- end
       -- Controls["Device_" .. x .. "_Status"].Value = 2 --fault
